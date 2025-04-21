@@ -15,7 +15,6 @@
             }
             else
             {
-                // test
                 Console.WriteLine($"Current Arguments: -v {o.Verbose}");
                 Console.WriteLine("Quick Start Example!");
             }
