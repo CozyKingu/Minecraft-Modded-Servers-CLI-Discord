@@ -1,23 +1,23 @@
-﻿namespace Minecraft_Easy_Servers
+﻿using Minecraft_Easy_Servers.Commands;
+using Minecraft_Easy_Servers.Commands.Abstract;
+
+namespace Minecraft_Easy_Servers
 {
-    public class MinecraftCommandLineRunner : ICommandLineRunner
+    public class MinecraftCommandLineRunner
+        : IRunner<AddServer>, IRunner<AddConfig>
     {
         public MinecraftCommandLineRunner()
         {
         }
 
-        public void Run(Options o)
+        public void Run(AddServer options)
         {
-            if (o.Verbose)
-            {
-                Console.WriteLine($"Verbose output enabled. Current Arguments: -v {o.Verbose}");
-                Console.WriteLine("Quick Start Example! App is in Verbose mode!");
-            }
-            else
-            {
-                Console.WriteLine($"Current Arguments: -v {o.Verbose}");
-                Console.WriteLine("Quick Start Example!");
-            }
+            Console.WriteLine("ok");
+        }
+
+        public void Run(AddConfig options)
+        {
+            throw new NotImplementedException();
         }
     }
 }

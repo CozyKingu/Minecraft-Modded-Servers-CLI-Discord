@@ -1,12 +1,24 @@
 ﻿using CommandLine;
 using Minecraft_Easy_Servers;
-using System.Runtime.CompilerServices;
+using Minecraft_Easy_Servers.Helpers;
+
+bool debug = true;
 
 var commandLineRunner = new MinecraftCommandLineRunner();
 SetupCommandLineRunner(args, commandLineRunner);
 
-static void SetupCommandLineRunner(string[] args, ICommandLineRunner commandLineRunner)
+if (debug)
+{ 
+    await MinecraftDownloader.DownloadMinecraftServer("1.20.4", "testFolder");
+    // DebugHelper.DeleteFolder("testFolder");
+}
+
+static void SetupCommandLineRunner(string[] args, MinecraftCommandLineRunner minecraftCommandLineRunner)
 {
-    Parser.Default.ParseArguments<Options>(args)
-                       .WithParsed(commandLineRunner.Run);
+    var verbs = CommandLineHelper.GetRunnerTypes(typeof(MinecraftCommandLineRunner)).ToArray();
+    Parser.Default.ParseArguments(args, verbs)
+                       .WithParsed(o =>
+                       {
+                           minecraftCommandLineRunner.Run((dynamic)o); // dispatch
+                       });
 }
