@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Minecraft_Easy_Servers
+namespace Minecraft_Easy_Servers.Helpers
 {
     using System;
     using System.IO;
@@ -42,8 +42,6 @@ namespace Minecraft_Easy_Servers
                 .GetString() !;
 
             string outputPath = Path.Combine(folderPath, $"minecraft_server_{version}.jar");
-
-            Directory.CreateDirectory(folderPath);
 
             using var serverStream = await client.GetStreamAsync(serverJarUrl);
             using var fileStream = File.Create(outputPath);

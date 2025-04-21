@@ -9,6 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\eula.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\eula.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
   </ItemGroup>
 

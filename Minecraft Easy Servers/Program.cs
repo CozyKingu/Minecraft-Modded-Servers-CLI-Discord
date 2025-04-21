@@ -1,21 +1,25 @@
 ﻿using CommandLine;
 using Minecraft_Easy_Servers;
 using Minecraft_Easy_Servers.Helpers;
+using Minecraft_Easy_Servers.Managers;
 
 bool debug = true;
 
-var commandLineRunner = new MinecraftCommandLineRunner();
+var configManager = new ConfigManager();
+var executeManager = new ExecuteManager();
+var serverManger = new ServerManager(executeManager);
+var commandLineRunner = new CLI(serverManger, configManager, executeManager);
 SetupCommandLineRunner(args, commandLineRunner);
 
 if (debug)
-{ 
-    await MinecraftDownloader.DownloadMinecraftServer("1.20.4", "testFolder");
-    // DebugHelper.DeleteFolder("testFolder");
+{
+    serverManger.RemoveServer("server1");
+    await serverManger.CreateServer("server1", "1.20.4");
 }
 
-static void SetupCommandLineRunner(string[] args, MinecraftCommandLineRunner minecraftCommandLineRunner)
+static void SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner)
 {
-    var verbs = CommandLineHelper.GetRunnerTypes(typeof(MinecraftCommandLineRunner)).ToArray();
+    var verbs = CommandLineHelper.GetRunnerTypes(typeof(CLI)).ToArray();
     Parser.Default.ParseArguments(args, verbs)
                        .WithParsed(o =>
                        {
