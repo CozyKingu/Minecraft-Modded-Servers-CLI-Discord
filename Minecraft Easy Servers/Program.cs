@@ -3,7 +3,7 @@ using Minecraft_Easy_Servers;
 using Minecraft_Easy_Servers.Helpers;
 using Minecraft_Easy_Servers.Managers;
 
-bool debug = true;
+bool debug = false;
 
 var configManager = new ConfigManager();
 var executeManager = new ExecuteManager();
@@ -13,8 +13,10 @@ SetupCommandLineRunner(args, commandLineRunner);
 
 if (debug)
 {
-    serverManger.RemoveServer("server1");
-    await serverManger.CreateServer("server1", "1.20.4");
+    //serverManger.RemoveServer("server1");
+    //await serverManger.CreateServer("server1", "1.20.4");
+    var status = serverManger.StatusServer("server1");
+    serverManger.UpServer("server1");
 }
 
 static void SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner)

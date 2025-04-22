@@ -1,6 +1,8 @@
 ﻿using Minecraft_Easy_Servers.Exceptions;
+using Minecraft_Easy_Servers.Helpers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -10,6 +12,8 @@ namespace Minecraft_Easy_Servers.Managers
 {
     public class ExecuteManager
     {
+        Dictionary<string, Process> processWithKeys = new Dictionary<string, Process>();
+
         public ExecuteManager()
         {
         }
@@ -52,6 +56,104 @@ namespace Minecraft_Easy_Servers.Managers
             process.WaitForExit();
         }
 
+        public int? RunBackgroundJar(string jarPath, string ackSubString, bool killIfAckFailed = false)
+        {
+            var logStringBuilder = new StringBuilder();
+            bool acknowledged = false;
+
+            EventWaitHandle eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = GetShellFileName(),
+                    Arguments = GetShellArguments(jarPath),
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(jarPath),
+                }
+            };
+
+            var stdOutPath = GetStdOutPath(jarPath);
+            File.Create(stdOutPath).Dispose(); // Creating empty file
+            var watcher = FileWatchHelper.Start(stdOutPath, (newLine) =>
+            {
+                logStringBuilder.AppendLine(newLine);
+                if (newLine.Contains(ackSubString))
+                {
+                    acknowledged = true;
+                    eventWaitHandle.Set();
+                }
+            }); 
+
+            process.Start();
+            string pidFilePath = GetPidPath(jarPath);
+            File.WriteAllText(pidFilePath, process.Id.ToString());
+            eventWaitHandle.WaitOne(TimeSpan.FromMinutes(1));
+
+            string logPath = GetLogPath(jarPath);
+            File.WriteAllText(logPath, logStringBuilder.ToString());
+            
+            watcher.Stop();
+
+            if (!acknowledged && killIfAckFailed)
+            {
+                Console.Error.WriteLine("Server jar launch failed to acknowledge. Java process will be killed.");
+                process.Kill();
+                return null;
+            }
+
+            return process.Id;
+        }
+
+        private static string GetShellFileName()
+        {
+            return Environment.OSVersion.Platform switch
+            {
+                PlatformID.Win32NT => @"C:\Windows\System32\cmd.exe",
+                _ => "/bin/bash"
+            };
+        }
+
+        private string GetShellArguments(string jarPath)
+        {
+            var javaPath = FindJavaInPath() ?? throw new ManagerException("No java.exe found in JAVA_HOME");
+            var arguments = $"-Xmx1G -Xms1G -jar {Path.GetFileName(jarPath)} nogui > {Path.GetFileName(GetStdOutPath(jarPath))}";
+
+            return Environment.OSVersion.Platform switch
+            {
+                PlatformID.Win32NT => $"/C \"{javaPath}\" {arguments}",
+                _ => $"-c \"{javaPath}\" {arguments}"
+            };
+        }
+
+        public bool KillJarProcess(string jarPath)
+        {
+            if (!JarStatus(jarPath, out var pid))
+                return false;
+
+            var process = Process.GetProcessById(pid !.Value);
+            process.Kill();
+            return true;
+        }
+
+        public bool JarStatus(string jarPath, out int? pid)
+        {
+            pid = null;
+            var pidPath = GetPidPath(jarPath);
+            if (!File.Exists(pidPath)) return false;
+            var pidFromFile = int.Parse(File.ReadAllText(pidPath));
+            pid = pidFromFile;
+
+            var processes = Process.GetProcesses();
+            return processes.FirstOrDefault(x => x.Id == pidFromFile) != null;
+        }
+
+        public bool ExistsProcess(string key)
+        {
+            return false;
+        }
+
         string? FindJavaInPath()
         {
             var pathEnv = Environment.GetEnvironmentVariable("JAVA_HOME");
@@ -63,6 +165,20 @@ namespace Minecraft_Easy_Servers.Managers
             return files
                 .Where(x => x.Contains("java.exe"))
                 .FirstOrDefault(File.Exists);
+        }
+        private static string GetPidPath(string jarPath)
+        {
+            return Path.Combine(Path.ChangeExtension(jarPath, ".pid"));
+        }
+
+        private static string GetStdOutPath(string jarPath)
+        {
+            return Path.Combine(Path.ChangeExtension(jarPath, ".out"));
+        }
+
+        private static string GetLogPath(string jarPath)
+        {
+            return Path.Combine(Path.ChangeExtension(jarPath, ".log"));
         }
     }
 }

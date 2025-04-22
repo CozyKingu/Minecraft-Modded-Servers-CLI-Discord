@@ -18,18 +18,49 @@ namespace Minecraft_Easy_Servers.Managers
             string name,
             string version)
         {
-            string folderPath = GetFolderPath(name);
-            if (Directory.Exists(folderPath))
+            if (ServerExists(name))
                 throw new ManagerException($"Server with name {name} already exists. To remove it, run: $ remove server {name}");
 
-            Directory.CreateDirectory(folderPath);
+            Directory.CreateDirectory(GetFolderPath(name));
             const string eulaAsset = "eula.txt";
-            CopyAssetToFolder(folderPath, eulaAsset);
+            CopyAssetToFolder(GetFolderPath(name), eulaAsset);
 
-            await MinecraftDownloader.DownloadMinecraftServer(version, folderPath);
+            await MinecraftDownloader.DownloadMinecraftServer(version, GetFolderPath(name));
             Console.WriteLine($"Download of server version {version} finished. Initializing server with first boot-up...");
 
             FirstRunServer(name);
+        }
+
+        private static bool ServerExists(string name)
+        {
+            return Directory.Exists(GetFolderPath(name));
+        }
+
+        public void UpServer(string name)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+
+            string serverJar = GetServerJar(name);
+            var pid = executeManager.RunBackgroundJar(serverJar, "Done", killIfAckFailed: true);
+            if (pid is null)
+                throw new ManagerException($"Server up command failed. Jar execution failed.");
+
+            Console.WriteLine($"Server jar with PID {pid} is running.");
+        }
+
+        public ServerStatus StatusServer(string name)
+        {
+            if (!ServerExists(name))
+                return ServerStatus.NONE;
+
+            string serverJar = GetServerJar(name);
+            var jarStatus = executeManager.JarStatus(serverJar, out _);
+            if (!jarStatus)
+                return ServerStatus.NONE;
+
+            return ServerStatus.PROCESS_RUNNING;
+            // TODO: Check is server is listening using MinecraftRCON communications on port.
         }
 
         private static string GetFolderPath(string name)
@@ -39,12 +70,15 @@ namespace Minecraft_Easy_Servers.Managers
 
         private void FirstRunServer(string name)
         {
-            var jarFiles = Directory.GetFiles(GetFolderPath(name), "*.jar");
-            var serverJar = jarFiles.Where(x => x.Contains("minecraft_server")).FirstOrDefault();
-            if (serverJar is null)
-                throw new ManagerException($"No jar file in {name} server folder");
-
+            string serverJar = GetServerJar(name);
             executeManager.ExecuteJarAndStop(serverJar, "Done");
+        }
+
+        private static string GetServerJar(string name)
+        {
+            var jarFiles = Directory.GetFiles(GetFolderPath(name), "*.jar");
+            var serverJar = jarFiles.Where(x => x.Contains("server")).FirstOrDefault() ?? throw new ManagerException($"No jar file in {name} server folder");
+            return serverJar;
         }
 
         public void RemoveServer(string name)
