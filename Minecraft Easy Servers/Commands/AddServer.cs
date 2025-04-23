@@ -5,7 +5,7 @@ namespace Minecraft_Easy_Servers.Commands
     [Verb("add server", HelpText = "Add new server given config")]
     public class AddServer : BaseOptions
     {
-        [Option('n', "name", HelpText = "Server name")]
+        [Value(0, MetaName = "server name", Required = true, HelpText = "Server name")]
         public required string Name { get; set; }
 
         [Option('v', "version", HelpText = "Minecraft version")]

@@ -4,7 +4,7 @@ using Minecraft_Easy_Servers.Helpers;
 using Minecraft_Easy_Servers.Managers;
 
 
-bool debug = true;
+bool debug = false;
 
 var configManager = new ConfigManager();
 var executeManager = new ExecuteManager();
