@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="CoreRCON" Version="5.4.2" />
+    <PackageReference Include="Salaros.ConfigParser" Version="0.3.8" />
   </ItemGroup>
 
 </Project>

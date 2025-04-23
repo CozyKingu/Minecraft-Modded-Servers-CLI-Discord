@@ -1,17 +1,20 @@
 ﻿using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
+using Salaros.Configuration;
 
 namespace Minecraft_Easy_Servers.Managers
 {
     public class ServerManager
     {
         private readonly ExecuteManager executeManager;
+        private readonly CommandManager commandManager;
         public const string FolderName = "servers";
         private const string AssetsFolder = "Assets";
 
-        public ServerManager(ExecuteManager executeManager)
+        public ServerManager(ExecuteManager executeManager, CommandManager commandManager)
         {
             this.executeManager = executeManager;
+            this.commandManager = commandManager;
         }
 
         public async Task CreateServer(
@@ -49,7 +52,7 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Server jar with PID {pid} is running.");
         }
 
-        public ServerStatus StatusServer(string name)
+        public async Task<ServerStatus> StatusServer(string name)
         {
             if (!ServerExists(name))
                 return ServerStatus.NONE;
@@ -59,8 +62,8 @@ namespace Minecraft_Easy_Servers.Managers
             if (!jarStatus)
                 return ServerStatus.NONE;
 
-            return ServerStatus.PROCESS_RUNNING;
-            // TODO: Check is server is listening using MinecraftRCON communications on port.
+            var serverStatus = await commandManager.GetStatus(GetRconPort(name));
+            return serverStatus != null ? ServerStatus.LISTENING : ServerStatus.PROCESS_RUNNING;
         }
 
         private static string GetFolderPath(string name)
@@ -72,6 +75,36 @@ namespace Minecraft_Easy_Servers.Managers
         {
             string serverJar = GetServerJar(name);
             executeManager.ExecuteJarAndStop(serverJar, "Done");
+        }
+
+        public int GetPort(string name)
+        {
+            return int.Parse(GetServerPropertiesValue(name, "server-port"));
+        }
+        
+        public int GetRconPort(string name)
+        {
+            return int.Parse(GetServerPropertiesValue(name, "rcon.port"));
+        }
+
+        public string GetServerPropertiesValue(string name, string propertyKey)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+            string serverPropertiesFilePath = GetServerPropertiesPath(name);
+            ConfigParser configParser = new ConfigParser(serverPropertiesFilePath, new ConfigParserSettings()
+            {
+                MultiLineValues = MultiLineValues.AllowEmptyTopSection
+            });
+            return configParser.NullSection.GetValue(propertyKey);
+        }
+
+        private static string GetServerPropertiesPath(string name)
+        {
+            string serverPropertiesFilePath = Path.Combine(GetFolderPath(name), "server.properties");
+            if (!File.Exists(serverPropertiesFilePath))
+                throw new ManagerException($"No server.properties in {name} server folder");
+            return serverPropertiesFilePath;
         }
 
         private static string GetServerJar(string name)

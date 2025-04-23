@@ -30,7 +30,7 @@ namespace Minecraft_Easy_Servers
 
         public void Run(CheckStatus options)
         {
-            var serverStatus = serverManager.StatusServer(options.Name);
+            var serverStatus = serverManager.StatusServer(options.Name).Result;
             var message = serverStatus switch
             {
                 ServerStatus.NONE => "Server not running",
