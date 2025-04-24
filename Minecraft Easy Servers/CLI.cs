@@ -18,19 +18,19 @@ namespace Minecraft_Easy_Servers
             this.executeManager = executeManager;
         }
 
-        public void Run(AddServer options)
+        public async Task Run(AddServer options)
         {
-            Console.WriteLine("ok");
+            await serverManager.CreateServer(options.Name, options.Version);
         }
 
-        public void Run(AddConfig options)
+        public async Task Run(AddConfig options)
         {
             throw new NotImplementedException();
         }
 
-        public void Run(CheckStatus options)
+        public async Task Run(CheckStatus options)
         {
-            var serverStatus = serverManager.StatusServer(options.Name).Result;
+            var serverStatus = await serverManager.StatusServer(options.Name);
             var message = serverStatus switch
             {
                 ServerStatus.NONE => "Server not running",
@@ -42,14 +42,15 @@ namespace Minecraft_Easy_Servers
             Console.WriteLine($"{message}");
         }
 
-        public void Run(DownServer options)
+        public async Task Run(DownServer options)
         {
-            serverManager.DownServer(options.Name);
+            await serverManager.DownServer(options.Name);
         }
 
-        public void Run(UpServer options)
+        public Task Run(UpServer options)
         {
             serverManager.UpServer(options.Name);
+            return Task.CompletedTask;
         }
     }
 }

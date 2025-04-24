@@ -27,6 +27,9 @@ namespace Minecraft_Easy_Servers.Managers
             {
                 Console.WriteLine("RCON password is wrong.");
             }
+            catch (Exception ex) {
+                Console.Write(ex.ToString());
+            }
 
             return null;
         }
@@ -39,7 +42,7 @@ namespace Minecraft_Easy_Servers.Managers
             await rcon.ConnectAsync();
 
             // Send a simple command and retrive response as string
-            string response = await rcon.SendCommandAsync("/stop");
+            string response = await rcon.SendCommandAsync("stop");
 
             // Send "status" and try to parse the response
             return IsSuccess(response) ? response : null;

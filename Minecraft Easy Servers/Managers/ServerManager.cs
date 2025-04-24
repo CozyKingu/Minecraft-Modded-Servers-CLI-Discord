@@ -55,21 +55,19 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Server jar with PID {pid} is running.");
         }
 
-        public void DownServer(string name)
+        public async Task DownServer(string name)
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
 
-            if (StatusServer(name).Result == ServerStatus.NONE)
+            if (await StatusServer(name) == ServerStatus.NONE)
                 throw new ManagerException($"Server with name {name} is not running. To run it, run: $ up {name}");
 
-            var response = commandManager.StopServer(GetRconPort(name), "password");
+            var response = await commandManager.StopServer(GetRconPort(name), "password");
             if (response is null)
                 executeManager.KillJarProcess(GetServerJar(name));
 
-            Thread.Sleep(2000);
-
-            var newStatus = StatusServer(name).Result;
+            var newStatus = await StatusServer(name);
             if (newStatus != ServerStatus.NONE)
                 Console.WriteLine($"Server failed to shutdown. Force shutdown from task manager (java.exe).");
             else
@@ -86,7 +84,7 @@ namespace Minecraft_Easy_Servers.Managers
             if (!jarStatus)
                 return ServerStatus.NONE;
 
-            var serverStatus = await commandManager.GetStatus(GetRconPort(name), "passwurd");
+            var serverStatus = await commandManager.GetStatus(GetRconPort(name), "password");
             return serverStatus != null ? ServerStatus.LISTENING : ServerStatus.PROCESS_RUNNING;
         }
 

@@ -12,7 +12,7 @@ var executeManager = new ExecuteManager();
 var commandManager = new CommandManager();
 var serverManger = new ServerManager(executeManager, commandManager);
 var commandLineRunner = new CLI(serverManger, configManager, executeManager);
-SetupCommandLineRunner(args, commandLineRunner);
+await SetupCommandLineRunner(args, commandLineRunner);
 
 if (debug)
 {
@@ -24,15 +24,16 @@ if (debug)
     Console.WriteLine(Enum.GetName(typeof(ServerStatus), status));
 }
 
-static void SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner)
+static async Task SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner)
 {
     var verbs = CommandLineHelper.GetRunnerTypes(typeof(CLI)).ToArray();
-    Parser.Default.ParseArguments(args, verbs)
-                       .WithParsed(o =>
+    await Parser.Default.ParseArguments(args, verbs)
+                       .WithParsedAsync(async o =>
                        {
                            try
                            {
-                                minecraftCommandLineRunner.Run((dynamic)o); // dispatch
+                                Task task = minecraftCommandLineRunner.Run((dynamic)o); // dispatch
+                               await task;
                            }
                            catch (ManagerException e)
                            {

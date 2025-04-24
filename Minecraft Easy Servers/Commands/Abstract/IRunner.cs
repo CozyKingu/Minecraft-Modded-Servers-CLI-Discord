@@ -2,6 +2,6 @@
 {
     public interface IRunner<in T> where T : BaseOptions
     {
-        void Run(T options);
+        Task Run(T options);
     }
 }
