@@ -44,11 +44,13 @@ namespace Minecraft_Easy_Servers
 
         public async Task Run(DownServer options)
         {
+            Console.WriteLine("Please wait...");
             await serverManager.DownServer(options.Name);
         }
 
         public Task Run(UpServer options)
         {
+            Console.WriteLine("Please wait...");
             serverManager.UpServer(options.Name, options.Port);
             return Task.CompletedTask;
         }

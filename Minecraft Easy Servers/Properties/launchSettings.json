@@ -8,6 +8,10 @@
       "commandName": "Project",
       "commandLineArgs": "down server1"
     },
+    "Up server 1": {
+      "commandName": "Project",
+      "commandLineArgs": "up server1 25566"
+    },
     "Status server 1": {
       "commandName": "Project",
       "commandLineArgs": "status server1"

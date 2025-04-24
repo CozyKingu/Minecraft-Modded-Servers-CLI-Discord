@@ -56,18 +56,17 @@ namespace Minecraft_Easy_Servers.Managers
             process.WaitForExit();
         }
 
-        public int? RunBackgroundJar(string jarPath, string ackSubString, string errorSubString, bool killIfAckFailed = false)
+        public int? RunBackgroundJar(string jarPath, string ackSubString, string errorSubString, string javaArgument, string jarArgument, bool killIfAckFailed = false)
         {
             var logStringBuilder = new StringBuilder();
             bool acknowledged = false;
-
             EventWaitHandle eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = GetShellFileName(),
-                    Arguments = GetShellArguments(jarPath),
+                    Arguments = GetShellArguments($"{javaArgument} -jar {Path.GetFileName(jarPath)} {jarArgument}"),
                     UseShellExecute = true,
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(jarPath),
@@ -120,11 +119,9 @@ namespace Minecraft_Easy_Servers.Managers
             };
         }
 
-        private string GetShellArguments(string jarPath)
+        private string GetShellArguments(string arguments)
         {
             var javaPath = FindJavaInPath() ?? throw new ManagerException("No java.exe found in JAVA_HOME");
-            var arguments = $"-Xmx1G -Xms1G -jar {Path.GetFileName(jarPath)} nogui > {Path.GetFileName(GetStdOutPath(jarPath))}";
-
             return Environment.OSVersion.Platform switch
             {
                 PlatformID.Win32NT => $"/C \"{javaPath}\" {arguments}",
@@ -176,7 +173,7 @@ namespace Minecraft_Easy_Servers.Managers
             return Path.Combine(Path.ChangeExtension(jarPath, ".pid"));
         }
 
-        private static string GetStdOutPath(string jarPath)
+        public static string GetStdOutPath(string jarPath)
         {
             return Path.Combine(Path.ChangeExtension(jarPath, ".out"));
         }

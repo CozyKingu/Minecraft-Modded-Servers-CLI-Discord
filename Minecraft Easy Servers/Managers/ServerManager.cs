@@ -47,12 +47,19 @@ namespace Minecraft_Easy_Servers.Managers
             if (StatusServer(name).Result != ServerStatus.NONE)
                 throw new ManagerException($"Server with name {name} is already running. To stop it, run: $ down {name}");
 
+            UpdateServerPropertiesValue(name, "motd", name);
             UpdateServerPropertiesValue(name, "server-port", port.ToString());
             UpdateServerPropertiesValue(name, "query.port", port.ToString());
             UpdateServerPropertiesValue(name, "rcon.port", (port + 10).ToString());
 
             string serverJar = GetServerJar(name);
-            var pid = executeManager.RunBackgroundJar(serverJar, "Done", "/ERROR", killIfAckFailed: true);
+            var pid = executeManager.RunBackgroundJar(
+                jarPath: serverJar,
+                ackSubString: "Done",
+                errorSubString: "/ERROR",
+                javaArgument: $"-Xmx1G -Xms1G",
+                jarArgument: $"nogui > {Path.GetFileName(ExecuteManager.GetStdOutPath(serverJar))}",
+                killIfAckFailed: true);
             if (pid is null)
                 throw new ManagerException($"Server up command failed. Jar execution failed.");
 

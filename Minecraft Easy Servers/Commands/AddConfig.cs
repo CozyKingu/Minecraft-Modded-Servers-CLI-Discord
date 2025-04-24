@@ -7,5 +7,8 @@ namespace Minecraft_Easy_Servers.Commands
     {
         [Value(0, MetaName = "config name", Required = true, HelpText = "Configuration name")]
         public required string Name { get; set; }
+
+        [Value(1, MetaName = "mod loader", HelpText = "[vanilla,forge,neoforge]")]
+        public required string ModLoader { get; set; }
     }
 }
