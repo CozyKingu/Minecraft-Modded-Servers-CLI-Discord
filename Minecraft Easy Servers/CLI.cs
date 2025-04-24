@@ -5,7 +5,7 @@ using Minecraft_Easy_Servers.Managers;
 namespace Minecraft_Easy_Servers
 {
     public class CLI
-        : IRunner<AddServer>, IRunner<AddConfig>, IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>
+        : IRunner<AddServer>, IRunner<AddConfig>, IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>, IRunner<RemoveServer>
     {
         private readonly ServerManager serverManager;
         private readonly ConfigManager configManager;
@@ -49,8 +49,13 @@ namespace Minecraft_Easy_Servers
 
         public Task Run(UpServer options)
         {
-            serverManager.UpServer(options.Name);
+            serverManager.UpServer(options.Name, options.Port);
             return Task.CompletedTask;
+        }
+
+        public async Task Run(RemoveServer options)
+        {
+            await serverManager.RemoveServer(options.Name);
         }
     }
 }

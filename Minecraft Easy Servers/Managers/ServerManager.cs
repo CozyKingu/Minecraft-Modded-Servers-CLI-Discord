@@ -1,6 +1,6 @@
-﻿using Minecraft_Easy_Servers.Exceptions;
+﻿using Kajabity.Tools.Java;
+using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
-using Salaros.Configuration;
 
 namespace Minecraft_Easy_Servers.Managers
 {
@@ -39,7 +39,7 @@ namespace Minecraft_Easy_Servers.Managers
             return Directory.Exists(GetFolderPath(name));
         }
 
-        public void UpServer(string name)
+        public void UpServer(string name, int port)
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
@@ -47,12 +47,27 @@ namespace Minecraft_Easy_Servers.Managers
             if (StatusServer(name).Result != ServerStatus.NONE)
                 throw new ManagerException($"Server with name {name} is already running. To stop it, run: $ down {name}");
 
+            UpdateServerPropertiesValue(name, "server-port", port.ToString());
+            UpdateServerPropertiesValue(name, "query.port", port.ToString());
+            UpdateServerPropertiesValue(name, "rcon.port", (port + 10).ToString());
+
             string serverJar = GetServerJar(name);
             var pid = executeManager.RunBackgroundJar(serverJar, "Done", killIfAckFailed: true);
             if (pid is null)
                 throw new ManagerException($"Server up command failed. Jar execution failed.");
 
             Console.WriteLine($"Server jar with PID {pid} is running.");
+        }
+
+        public async Task RemoveServer(string name)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists.");
+
+            if (await StatusServer(name) != ServerStatus.NONE)
+                throw new ManagerException($"Server with name {name} is  running. Stop it before removing it. run: $ down {name}");
+
+            InternalRemoveServer(name);
         }
 
         public async Task DownServer(string name)
@@ -116,11 +131,34 @@ namespace Minecraft_Easy_Servers.Managers
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
             string serverPropertiesFilePath = GetServerPropertiesPath(name);
-            ConfigParser configParser = new ConfigParser(serverPropertiesFilePath, new ConfigParserSettings()
+            var properties = new JavaProperties();
+
+            using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
             {
-                MultiLineValues = MultiLineValues.AllowEmptyTopSection
-            });
-            return configParser.NullSection.GetValue(propertyKey);
+                properties.Load(streamIn);
+            }
+
+            return properties.GetValueOrDefault(propertyKey) ?? throw new ManagerException($"Property {propertyKey} is missing in {name} server server.properties");
+        }
+
+        public bool UpdateServerPropertiesValue(string name, string propertyKey, string newValue)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+            string serverPropertiesFilePath = GetServerPropertiesPath(name);
+            var properties = new JavaProperties();
+            using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
+            {
+                properties.Load(streamIn);
+            }
+
+            properties.SetProperty(propertyKey, newValue);
+            using (FileStream streamOut = new(serverPropertiesFilePath, FileMode.Open))
+            {
+                properties.Store(streamOut);
+            }
+
+            return true;
         }
 
         private static string GetServerPropertiesPath(string name)
@@ -138,7 +176,7 @@ namespace Minecraft_Easy_Servers.Managers
             return serverJar;
         }
 
-        public void RemoveServer(string name)
+        private void InternalRemoveServer(string name)
         {
             Directory.Delete(GetFolderPath(name), recursive: true);
         }

@@ -74,6 +74,7 @@ namespace Minecraft_Easy_Servers.Managers
                 }
             };
 
+            // TODO: error ack /ERROR
             var stdOutPath = GetStdOutPath(jarPath);
             File.Create(stdOutPath).Dispose(); // Creating empty file
             var watcher = FileWatchHelper.Start(stdOutPath, (newLine) =>
