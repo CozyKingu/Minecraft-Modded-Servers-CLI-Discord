@@ -5,20 +5,41 @@ namespace Minecraft_Easy_Servers.Managers
 {
     public class CommandManager
     {
+        private const string LOCALHOST = "127.0.0.1";
+
         public CommandManager()
         {
         }
 
-        public async Task<string?> GetStatus(int port)
+        public async Task<string?> GetStatus(int port, string rconPassword)
         {
-            var host = "127.0.0.1";
-            var password = "password";
+            var host = LOCALHOST;
 
-            var rcon = new RCON(new IPEndPoint(IPAddress.Parse(host), port), password);
+            try
+            {
+                var rcon = new RCON(new IPEndPoint(IPAddress.Parse(host), port), rconPassword);
+                await rcon.ConnectAsync();
+                // Send a simple command and retrive response as string
+                string response = await rcon.SendCommandAsync("/list");
+                return IsSuccess(response) ? response : null;
+            }
+            catch (AuthenticationException)
+            {
+                Console.WriteLine("RCON password is wrong.");
+            }
+
+            return null;
+        }
+
+        public async Task<string?> StopServer(int port, string rconPassword)
+        {
+            var host = LOCALHOST;
+
+            var rcon = new RCON(new IPEndPoint(IPAddress.Parse(host), port), rconPassword);
             await rcon.ConnectAsync();
 
             // Send a simple command and retrive response as string
-            string response = await rcon.SendCommandAsync("/list");
+            string response = await rcon.SendCommandAsync("/stop");
 
             // Send "status" and try to parse the response
             return IsSuccess(response) ? response : null;

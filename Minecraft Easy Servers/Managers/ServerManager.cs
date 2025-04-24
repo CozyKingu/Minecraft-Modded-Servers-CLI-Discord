@@ -44,12 +44,36 @@ namespace Minecraft_Easy_Servers.Managers
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
 
+            if (StatusServer(name).Result != ServerStatus.NONE)
+                throw new ManagerException($"Server with name {name} is already running. To stop it, run: $ down {name}");
+
             string serverJar = GetServerJar(name);
             var pid = executeManager.RunBackgroundJar(serverJar, "Done", killIfAckFailed: true);
             if (pid is null)
                 throw new ManagerException($"Server up command failed. Jar execution failed.");
 
             Console.WriteLine($"Server jar with PID {pid} is running.");
+        }
+
+        public void DownServer(string name)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+
+            if (StatusServer(name).Result == ServerStatus.NONE)
+                throw new ManagerException($"Server with name {name} is not running. To run it, run: $ up {name}");
+
+            var response = commandManager.StopServer(GetRconPort(name), "password");
+            if (response is null)
+                executeManager.KillJarProcess(GetServerJar(name));
+
+            Thread.Sleep(2000);
+
+            var newStatus = StatusServer(name).Result;
+            if (newStatus != ServerStatus.NONE)
+                Console.WriteLine($"Server failed to shutdown. Force shutdown from task manager (java.exe).");
+            else
+                Console.WriteLine($"Server stopped.");
         }
 
         public async Task<ServerStatus> StatusServer(string name)
@@ -62,7 +86,7 @@ namespace Minecraft_Easy_Servers.Managers
             if (!jarStatus)
                 return ServerStatus.NONE;
 
-            var serverStatus = await commandManager.GetStatus(GetRconPort(name));
+            var serverStatus = await commandManager.GetStatus(GetRconPort(name), "passwurd");
             return serverStatus != null ? ServerStatus.LISTENING : ServerStatus.PROCESS_RUNNING;
         }
 

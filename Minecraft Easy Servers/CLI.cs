@@ -5,7 +5,7 @@ using Minecraft_Easy_Servers.Managers;
 namespace Minecraft_Easy_Servers
 {
     public class CLI
-        : IRunner<AddServer>, IRunner<AddConfig>, IRunner<CheckStatus>
+        : IRunner<AddServer>, IRunner<AddConfig>, IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>
     {
         private readonly ServerManager serverManager;
         private readonly ConfigManager configManager;
@@ -40,6 +40,16 @@ namespace Minecraft_Easy_Servers
             };
 
             Console.WriteLine($"{message}");
+        }
+
+        public void Run(DownServer options)
+        {
+            serverManager.DownServer(options.Name);
+        }
+
+        public void Run(UpServer options)
+        {
+            serverManager.UpServer(options.Name);
         }
     }
 }

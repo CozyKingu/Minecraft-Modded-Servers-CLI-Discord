@@ -1,5 +1,6 @@
 ﻿using CommandLine;
 using Minecraft_Easy_Servers;
+using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
 using Minecraft_Easy_Servers.Managers;
 
@@ -29,6 +30,13 @@ static void SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner
     Parser.Default.ParseArguments(args, verbs)
                        .WithParsed(o =>
                        {
-                           minecraftCommandLineRunner.Run((dynamic)o); // dispatch
+                           try
+                           {
+                                minecraftCommandLineRunner.Run((dynamic)o); // dispatch
+                           }
+                           catch (ManagerException e)
+                           {
+                                Console.WriteLine(e.Message);
+                           }
                        });
 }
