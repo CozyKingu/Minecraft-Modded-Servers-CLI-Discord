@@ -9,7 +9,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\eula.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\eula.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="CoreRCON" Version="5.4.2" />
+    <PackageReference Include="Kajabity.Tools.Java" Version="0.3.8895.38751" />
   </ItemGroup>
 
 </Project>

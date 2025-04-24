@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "Minecraft Easy Servers": {
+      "commandName": "Project",
+      "commandLineArgs": " add-server server2 -v 1.21.3"
+    },
+    "Down server 1": {
+      "commandName": "Project",
+      "commandLineArgs": "down server1"
+    },
+    "Status server 1": {
+      "commandName": "Project",
+      "commandLineArgs": "status server1"
+    }
+  }
+}
