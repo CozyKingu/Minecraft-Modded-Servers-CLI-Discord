@@ -52,7 +52,7 @@ namespace Minecraft_Easy_Servers.Managers
             UpdateServerPropertiesValue(name, "rcon.port", (port + 10).ToString());
 
             string serverJar = GetServerJar(name);
-            var pid = executeManager.RunBackgroundJar(serverJar, "Done", killIfAckFailed: true);
+            var pid = executeManager.RunBackgroundJar(serverJar, "Done", "/ERROR", killIfAckFailed: true);
             if (pid is null)
                 throw new ManagerException($"Server up command failed. Jar execution failed.");
 

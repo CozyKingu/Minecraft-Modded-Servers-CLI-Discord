@@ -56,7 +56,7 @@ namespace Minecraft_Easy_Servers.Managers
             process.WaitForExit();
         }
 
-        public int? RunBackgroundJar(string jarPath, string ackSubString, bool killIfAckFailed = false)
+        public int? RunBackgroundJar(string jarPath, string ackSubString, string errorSubString, bool killIfAckFailed = false)
         {
             var logStringBuilder = new StringBuilder();
             bool acknowledged = false;
@@ -74,7 +74,6 @@ namespace Minecraft_Easy_Servers.Managers
                 }
             };
 
-            // TODO: error ack /ERROR
             var stdOutPath = GetStdOutPath(jarPath);
             File.Create(stdOutPath).Dispose(); // Creating empty file
             var watcher = FileWatchHelper.Start(stdOutPath, (newLine) =>
@@ -83,6 +82,11 @@ namespace Minecraft_Easy_Servers.Managers
                 if (newLine.Contains(ackSubString))
                 {
                     acknowledged = true;
+                    eventWaitHandle.Set();
+                }
+
+                if (newLine.Contains(errorSubString))
+                {
                     eventWaitHandle.Set();
                 }
             }); 
