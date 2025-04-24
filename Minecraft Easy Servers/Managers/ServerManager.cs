@@ -66,8 +66,10 @@ namespace Minecraft_Easy_Servers.Managers
             var response = await commandManager.StopServer(GetRconPort(name), "password");
             if (response is null)
                 executeManager.KillJarProcess(GetServerJar(name));
+            else
+                Thread.Sleep(2000);
 
-            var newStatus = await StatusServer(name);
+                var newStatus = await StatusServer(name);
             if (newStatus != ServerStatus.NONE)
                 Console.WriteLine($"Server failed to shutdown. Force shutdown from task manager (java.exe).");
             else
