@@ -99,11 +99,17 @@ namespace Minecraft_Easy_Servers.Managers
         {
             AddAsset(name, resourcePackName, link, "resourcePacks");
 
+            var configPath = GetConfigPath(name);
+            var store = new DataStore(configPath);
+            var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
+            clientConfig.ResourcePacks ??= new List<string>();
+            if (!clientConfig.ResourcePacks.Contains(resourcePackName))
+            {
+                clientConfig.ResourcePacks.Add(resourcePackName);
+                store.ReplaceItem("client", clientConfig);
+            }
             if (isServerDefault)
             {
-                var configPath = GetConfigPath(name);
-                var store = new DataStore(configPath);
-
                 // Update the server.resource_pack property
                 var config = store.GetItem<ServerConfig>("server");
                 config.ResourcePack = resourcePackName;
@@ -115,17 +121,25 @@ namespace Minecraft_Easy_Servers.Managers
         public void AddWorld(string name, string worldName, string link, bool isServerDefault = false)
         {
             AddAsset(name, worldName, link, "worlds");
+            var configPath = GetConfigPath(name);
+            var store = new DataStore(configPath);
 
             if (isServerDefault)
             {
-                var configPath = GetConfigPath(name);
-                var store = new DataStore(configPath);
 
                 // Update the server.default_world property
                 var config = store.GetItem<ServerConfig>("server");
                 config.DefaultWorld = worldName;
                 store.ReplaceItem("server", config);
                 Console.WriteLine($"World {worldName} set as default for config {name}.");
+            }
+
+            var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
+            clientConfig.Worlds ??= new List<string>();
+            if (!clientConfig.Worlds.Contains(worldName))
+            {
+                clientConfig.Worlds.Add(worldName);
+                store.ReplaceItem("client", clientConfig);
             }
         }
 
@@ -215,6 +229,14 @@ namespace Minecraft_Easy_Servers.Managers
                 Console.WriteLine($"Resource pack {resourcePackName} was the default and has been removed from the default property.");
             }
 
+            // Remove from client configuration if present
+            var clientConfig = store.GetItem<ClientConfig>("client");
+            if (clientConfig?.ResourcePacks != null && clientConfig.ResourcePacks.Contains(resourcePackName))
+            {
+                clientConfig.ResourcePacks.Remove(resourcePackName);
+                store.ReplaceItem("client", clientConfig);
+            }
+
             RemoveAsset(name, resourcePackName, "resourcePacks");
         }
 
@@ -234,6 +256,14 @@ namespace Minecraft_Easy_Servers.Managers
                 store.ReplaceItem("server", config);
                 Console.WriteLine($"World {worldName} was the default and has been removed from the default property.");
             }
+            // Remove from client configuration if present
+            var clientConfig = store.GetItem<ClientConfig>("client");
+            if (clientConfig?.Worlds != null && clientConfig.Worlds.Contains(worldName))
+            {
+                clientConfig.Worlds.Remove(worldName);
+                store.ReplaceItem("client", clientConfig);
+            }
+
 
             RemoveAsset(name, worldName, "worlds");
         }
