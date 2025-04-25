@@ -21,6 +21,7 @@
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="CoreRCON" Version="5.4.2" />
+    <PackageReference Include="JsonFlatFileDataStore" Version="2.4.2" />
     <PackageReference Include="Kajabity.Tools.Java" Version="0.3.8895.38751" />
   </ItemGroup>
 

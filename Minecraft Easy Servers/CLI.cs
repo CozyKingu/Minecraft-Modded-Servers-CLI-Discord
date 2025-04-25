@@ -1,11 +1,17 @@
 ﻿using Minecraft_Easy_Servers.Commands;
 using Minecraft_Easy_Servers.Commands.Abstract;
 using Minecraft_Easy_Servers.Managers;
+using Minecraft_Easy_Servers.Managers.Models;
 
 namespace Minecraft_Easy_Servers
 {
-    public class CLI
-        : IRunner<AddServer>, IRunner<AddConfig>, IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>, IRunner<RemoveServer>
+    public class CLI :
+            // Add commands
+            IRunner<AddServer>, IRunner<AddConfig>, IRunner<AddMod>, IRunner<AddPlugin>, IRunner<AddResourcePack>,
+            // Remove commands
+            IRunner<RemoveServer>, IRunner<RemoveConfig>, IRunner<RemoveMod>, IRunner<RemovePlugin>, IRunner<RemoveResourcePack>,
+            // Server execution commands
+            IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>
     {
         private readonly ServerManager serverManager;
         private readonly ConfigManager configManager;
@@ -23,9 +29,10 @@ namespace Minecraft_Easy_Servers
             await serverManager.CreateServer(options.Name, options.Version);
         }
 
-        public async Task Run(AddConfig options)
+        public Task Run(AddConfig options)
         {
-            throw new NotImplementedException();
+            configManager.CreateConfig(options.Name, options.ModLoader, options.Version);
+            return Task.CompletedTask;
         }
 
         public async Task Run(CheckStatus options)
@@ -58,6 +65,52 @@ namespace Minecraft_Easy_Servers
         public async Task Run(RemoveServer options)
         {
             await serverManager.RemoveServer(options.Name);
+        }
+
+        public Task Run(AddMod options)
+        {
+            var modType =
+                    options.ClientSide ? ModTypeEnum.CLIENT
+                    : options.ServerSide ? ModTypeEnum.SERVER
+                    : ModTypeEnum.GLOBAL;
+            configManager.AddMod(options.ConfigName, options.Name, options.Link, modType);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(RemoveConfig options)
+        {
+            configManager.RemoveConfig(options.Name);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(RemoveMod options)
+        {
+            configManager.RemoveMod(options.ConfigName, options.Name);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(AddPlugin options)
+        {
+            configManager.AddPlugin(options.ConfigName, options.Name, options.Link);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(AddResourcePack options)
+        {
+            configManager.AddResourcePack(options.ConfigName, options.Name, options.Link, options.ServerDefault);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(RemovePlugin options)
+        {
+            configManager.RemovePlugin(options.ConfigName, options.Name);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(RemoveResourcePack options)
+        {
+            configManager.RemoveResourcePack(options.ConfigName, options.Name);
+            return Task.CompletedTask;
         }
     }
 }
