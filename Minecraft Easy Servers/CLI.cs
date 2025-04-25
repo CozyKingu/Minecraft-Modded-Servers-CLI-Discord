@@ -7,9 +7,9 @@ namespace Minecraft_Easy_Servers
 {
     public class CLI :
             // Add commands
-            IRunner<AddServer>, IRunner<AddConfig>, IRunner<AddMod>, IRunner<AddPlugin>, IRunner<AddResourcePack>,
+            IRunner<AddServer>, IRunner<AddConfig>, IRunner<AddMod>, IRunner<AddPlugin>, IRunner<AddResourcePack>, IRunner<AddWorld>,
             // Remove commands
-            IRunner<RemoveServer>, IRunner<RemoveConfig>, IRunner<RemoveMod>, IRunner<RemovePlugin>, IRunner<RemoveResourcePack>,
+            IRunner<RemoveServer>, IRunner<RemoveConfig>, IRunner<RemoveMod>, IRunner<RemovePlugin>, IRunner<RemoveResourcePack>, IRunner<RemoveWorld>,
             // Server execution commands
             IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>
     {
@@ -110,6 +110,18 @@ namespace Minecraft_Easy_Servers
         public Task Run(RemoveResourcePack options)
         {
             configManager.RemoveResourcePack(options.ConfigName, options.Name);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(RemoveWorld options)
+        {
+            configManager.RemoveWorld(options.ConfigName, options.Name);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(AddWorld options)
+        {
+            configManager.AddWorld(options.ConfigName, options.Name, options.Link, options.ServerDefault);
             return Task.CompletedTask;
         }
     }
