@@ -97,7 +97,7 @@ namespace Minecraft_Easy_Servers.Managers
 
         public void AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
-            AddAsset(name, resourcePackName, link, "resource_packs");
+            AddAsset(name, resourcePackName, link, "resourcePacks");
 
             if (isServerDefault)
             {
@@ -215,7 +215,7 @@ namespace Minecraft_Easy_Servers.Managers
                 Console.WriteLine($"Resource pack {resourcePackName} was the default and has been removed from the default property.");
             }
 
-            RemoveAsset(name, resourcePackName, "resource_packs");
+            RemoveAsset(name, resourcePackName, "resourcePacks");
         }
 
         public void RemoveWorld(string name, string worldName)
