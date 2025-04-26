@@ -47,6 +47,50 @@ namespace Minecraft_Easy_Servers.Helpers
             using var fileStream = File.Create(outputPath);
             await serverStream.CopyToAsync(fileStream);
         }
-    }
 
+
+        public static async Task<string> DownloadFile(string targetDirectoryPath, string link)
+        {
+            using (var httpClient = new HttpClient())
+            {
+                var response = await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                // Extract the file name from the Content-Disposition header if available
+                var contentDisposition = response.Content.Headers.ContentDisposition;
+                var fileName = contentDisposition?.FileNameStar ?? contentDisposition?.FileName;
+
+                if (string.IsNullOrEmpty(fileName) && !UrlLooksLikeFile(link, out fileName))
+                    throw new Exception("Filname cannot be determined.");
+
+                // Combine the directory path with the file name
+                var targetFilePath = Path.Combine(targetDirectoryPath, fileName !);
+
+                using var fileStream = new FileStream(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await response.Content.CopyToAsync(fileStream);
+
+                return targetFilePath;
+            }
+        }
+        public static bool UrlLooksLikeFile(string url, out string? fileName)
+        {
+            fileName = null;
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+
+            try
+            {
+                var uri = new Uri(url);
+                var path = uri.AbsolutePath;
+                var lastSegment = System.IO.Path.GetFileName(path);
+                var isFile = lastSegment.Contains('.') && !lastSegment.EndsWith(".");
+                fileName = lastSegment;
+                return isFile;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 }

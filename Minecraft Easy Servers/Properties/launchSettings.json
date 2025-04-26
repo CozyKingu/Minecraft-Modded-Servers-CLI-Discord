@@ -15,6 +15,10 @@
     "Status server 1": {
       "commandName": "Project",
       "commandLineArgs": "status server1"
+    },
+    "Add mod configtest": {
+      "commandName": "Project",
+      "commandLineArgs": "add-mod configtest the-beast https://mediafilez.forgecdn.net/files/5294/86/The-Beast-1.19.2.jar"
     }
   }
 }

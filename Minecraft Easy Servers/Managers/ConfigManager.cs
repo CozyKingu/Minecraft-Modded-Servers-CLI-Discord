@@ -58,13 +58,15 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"{collectionName} {assetName} added to config {name}.");
         }
 
-        public void AddMod(string name, string modName, string link, ModTypeEnum modType)
+        public async Task AddMod(string name, string modName, string link, ModTypeEnum modType)
         {
+            await DownloadOrCopyAssetAsync(configName: name, assetName: "mods", assetLink: link, searchForFileWithExtension: ".jar");
+            
             AddAsset(name, modName, link, "mods");
-
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
+            // Sync server and client config.
             if (modType == ModTypeEnum.SERVER || modType == ModTypeEnum.GLOBAL)
             {
                 var serverConfig = store.GetItem<ServerConfig>("server") ?? new ServerConfig();
@@ -238,6 +240,114 @@ namespace Minecraft_Easy_Servers.Managers
             }
 
             RemoveAsset(name, resourcePackName, "resourcePacks");
+        }
+
+        // List asset by asset type. Give Asset objects correspond to the collection
+        public List<Asset> ListAssets(string configName, string assetName)
+        {
+            if (!ConfigExists(configName))
+                throw new ManagerException($"Config with name {configName} doesn't exist. To create it, run: $ add-config {configName}");
+            var store = new DataStore(GetConfigPath(configName));
+            var collection = store.GetCollection<Asset>(assetName);
+            return collection.AsQueryable().ToList();
+        }
+
+        // Download mods
+        private async Task DownloadAssetsAsync(string configName, string assetName, string? searchForFileWithExtension = null, bool extractOnly = false)
+        {
+            var assets = ListAssets(configName, assetName)
+                .Where(x => x.Link.Contains("http") || x.Link.Contains("https"));
+            foreach (var asset in assets)
+            {
+                await DownloadOrCopyAssetAsync(configName, assetName, asset.Link, searchForFileWithExtension, extractOnly);
+            }
+        }
+
+        private static async Task DownloadOrCopyAssetAsync(string configName, string assetName, string assetLink, string? searchForFileWithExtension, bool extractOnly = false)
+        {
+            var assetFolderPath = GetOrCreateAssetFolderPath(configName, assetName);
+            if (!(assetLink.Contains("http") || assetLink.Contains("https")))
+            {
+                if (!File.Exists(assetLink) || (searchForFileWithExtension != null && !assetLink.Contains(searchForFileWithExtension)))
+                    throw new ManagerException($"Asset link is not an URL nor a valid filePath" + searchForFileWithExtension != null ? $" with {searchForFileWithExtension} extension" : string.Empty);
+
+                File.Copy(assetLink, Path.Combine(assetFolderPath, Path.GetFileName(assetLink)), true);
+                return;
+            }
+
+            var file = await MinecraftDownloader.DownloadFile(assetFolderPath, assetLink);
+            if (Path.GetExtension(file).Equals(".zip", StringComparison.OrdinalIgnoreCase) && searchForFileWithExtension != ".zip")
+            {
+                var extractPath = Path.Combine(assetFolderPath, assetName);
+                Directory.CreateDirectory(extractPath);
+                System.IO.Compression.ZipFile.ExtractToDirectory(file, extractPath);
+
+                if (extractOnly)
+                {
+                    Console.WriteLine($"Extracted {file} to {extractPath}.");
+                    // Delete zip file
+                    File.Delete(file);
+                    return;
+                }
+                var extractedFiles = Directory.GetFiles(extractPath, $"*{searchForFileWithExtension}", SearchOption.AllDirectories);
+                if (extractedFiles.Any())
+                {
+                    var targetFile = extractedFiles.First();
+                    var targetFilePath = Path.Combine(assetFolderPath, Path.GetFileName(targetFile));
+                    File.Move(targetFile, targetFilePath, true);
+
+                    Directory.Delete(extractPath, true);
+                    File.Delete(file);
+
+                    Console.WriteLine($"Isolated file {Path.GetFileName(targetFile)} in {assetFolderPath}.");
+                }
+
+                Directory.Delete(extractPath, true);
+            }
+        }
+
+        private static string GetOrCreateAssetFolderPath(string configName, string assetName)
+        {
+            var assetFolderPath = Path.Combine(GetFolderPath(configName), assetName);
+            if (!Directory.Exists(assetFolderPath))
+                Directory.CreateDirectory(assetFolderPath);
+
+            return assetFolderPath;
+        }
+
+        public async Task SetupConfigAsync(string name)
+        {
+            if (!ConfigExists(name))
+                throw new ManagerException($"Config with name {name} doesn't exist. To create it, run: $ add-config {name}");
+
+            var configPath = GetConfigPath(name);
+            var store = new DataStore(configPath);
+
+            //// Download mods
+            //await DownloadAssetsAsync(configName: name, assetName: "mods", targetSubFolder: "mods", searchForFileWithExtension: ".jar");
+
+            //// Download plugins
+            //await DownloadAssetsAsync(configName: name, assetName: "plugins", targetSubFolder: "plugins", searchForFileWithExtension: ".jar");
+
+            //// Download resource packs
+            //await DownloadAssetsAsync(configName: name, assetName: "resourcePacks", targetSubFolder: "resourcePacks", searchForFileWithExtension: ".zip");
+
+            //// Download worlds
+            //await DownloadAssetsAsync(configName: name, assetName: "worlds", targetSubFolder: "worlds", null, extractOnly: true);
+
+            Console.WriteLine($"Config {name} setup completed. All assets have been downloaded.");
+        }
+
+        private static async Task<string> DownloadAssetAsync(Asset asset, string targetFolder)
+        {
+            Directory.CreateDirectory(targetFolder);
+            var targetFilePath = Path.Combine(targetFolder, asset.Name);
+
+            var link = asset.Link;
+            var filePath = await MinecraftDownloader.DownloadFile(targetFolder, link);
+
+            Console.WriteLine($"Downloaded {filePath} for asset {asset.Name} to {targetFolder}.");
+            return filePath;
         }
 
         public void RemoveWorld(string name, string worldName)

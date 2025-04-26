@@ -67,14 +67,13 @@ namespace Minecraft_Easy_Servers
             await serverManager.RemoveServer(options.Name);
         }
 
-        public Task Run(AddMod options)
+        public async Task Run(AddMod options)
         {
             var modType =
                     options.ClientSide ? ModTypeEnum.CLIENT
                     : options.ServerSide ? ModTypeEnum.SERVER
                     : ModTypeEnum.GLOBAL;
-            configManager.AddMod(options.ConfigName, options.Name, options.Link, modType);
-            return Task.CompletedTask;
+            await configManager.AddMod(options.ConfigName, options.Name, options.Link, modType);
         }
 
         public Task Run(RemoveConfig options)
