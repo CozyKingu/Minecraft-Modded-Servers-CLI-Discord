@@ -49,7 +49,7 @@ namespace Minecraft_Easy_Servers.Helpers
         }
 
 
-        public static async Task<string> DownloadFile(string targetDirectoryPath, string link)
+        public static async Task<string> DownloadFile(string targetDirectoryPath, string link, string? prefixName = null)
         {
             using (var httpClient = new HttpClient())
             {
@@ -64,6 +64,7 @@ namespace Minecraft_Easy_Servers.Helpers
                     throw new Exception("Filname cannot be determined.");
 
                 // Combine the directory path with the file name
+                fileName = prefixName  != null ? fileName = prefixName + "_" + fileName : fileName;
                 var targetFilePath = Path.Combine(targetDirectoryPath, fileName !);
 
                 using var fileStream = new FileStream(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.None);

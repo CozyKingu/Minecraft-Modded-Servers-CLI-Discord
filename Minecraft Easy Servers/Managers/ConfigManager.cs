@@ -60,8 +60,8 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddMod(string name, string modName, string link, ModTypeEnum modType)
         {
-            await DownloadOrCopyAssetAsync(configName: name, assetName: "mods", assetLink: link, searchForFileWithExtension: ".jar");
-            
+            await DownloadOrCopyAssetAsync(configName: name, assetType: "mods", assetName: modName, assetLink: link, searchForFileWithExtension: ".jar");
+
             AddAsset(name, modName, link, "mods");
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
@@ -259,50 +259,42 @@ namespace Minecraft_Easy_Servers.Managers
                 .Where(x => x.Link.Contains("http") || x.Link.Contains("https"));
             foreach (var asset in assets)
             {
-                await DownloadOrCopyAssetAsync(configName, assetName, asset.Link, searchForFileWithExtension, extractOnly);
+                await DownloadOrCopyAssetAsync(configName, assetName, "", asset.Link, searchForFileWithExtension, extractOnly);
             }
         }
 
-        private static async Task DownloadOrCopyAssetAsync(string configName, string assetName, string assetLink, string? searchForFileWithExtension, bool extractOnly = false)
+        private static async Task DownloadOrCopyAssetAsync(string configName, string assetType, string assetName, string assetLink, string? searchForFileWithExtension, bool contentIsFolder = false)
         {
-            var assetFolderPath = GetOrCreateAssetFolderPath(configName, assetName);
+            var assetFolderPath = GetOrCreateAssetFolderPath(configName, assetType);
+            string filePath;
             if (!(assetLink.Contains("http") || assetLink.Contains("https")))
             {
-                if (!File.Exists(assetLink) || (searchForFileWithExtension != null && !assetLink.Contains(searchForFileWithExtension)))
-                    throw new ManagerException($"Asset link is not an URL nor a valid filePath" + searchForFileWithExtension != null ? $" with {searchForFileWithExtension} extension" : string.Empty);
+                if (!File.Exists(assetLink))
+                    throw new ManagerException($"Asset link is not an URL nor a valid filePath");
 
-                File.Copy(assetLink, Path.Combine(assetFolderPath, Path.GetFileName(assetLink)), true);
-                return;
-            }
+                if ((searchForFileWithExtension != null && !assetLink.Contains(searchForFileWithExtension) && !contentIsFolder && !assetLink.Contains(".zip")))
+                    throw new Exception($"Asset link {assetLink} does not contain the expected file extension {searchForFileWithExtension}");
 
-            var file = await MinecraftDownloader.DownloadFile(assetFolderPath, assetLink);
-            if (Path.GetExtension(file).Equals(".zip", StringComparison.OrdinalIgnoreCase) && searchForFileWithExtension != ".zip")
-            {
-                var extractPath = Path.Combine(assetFolderPath, assetName);
-                Directory.CreateDirectory(extractPath);
-                System.IO.Compression.ZipFile.ExtractToDirectory(file, extractPath);
-
-                if (extractOnly)
+                if (searchForFileWithExtension != null && assetLink.Contains(searchForFileWithExtension))
                 {
-                    Console.WriteLine($"Extracted {file} to {extractPath}.");
-                    // Delete zip file
-                    File.Delete(file);
+                    // Copy file and finish.
+                    File.Copy(assetLink, Path.Combine(assetFolderPath, Path.GetFileName(assetLink)), true);
                     return;
                 }
-                var extractedFiles = Directory.GetFiles(extractPath, $"*{searchForFileWithExtension}", SearchOption.AllDirectories);
-                if (extractedFiles.Any())
-                {
-                    var targetFile = extractedFiles.First();
-                    var targetFilePath = Path.Combine(assetFolderPath, Path.GetFileName(targetFile));
-                    File.Move(targetFile, targetFilePath, true);
+                else
+                    filePath = assetLink;
+            }
+            else
+                filePath = await MinecraftDownloader.DownloadFile(assetFolderPath, assetLink, prefixName: assetName);
 
-                    Directory.Delete(extractPath, true);
-                    File.Delete(file);
-
-                    Console.WriteLine($"Isolated file {Path.GetFileName(targetFile)} in {assetFolderPath}.");
-                }
-
-                Directory.Delete(extractPath, true);
+            if (Path.GetExtension(filePath).Equals(".zip", StringComparison.OrdinalIgnoreCase) && searchForFileWithExtension != ".zip")
+            {
+                var contentPath = ArchiveHelper.ExtractZipAndIsolateContentAddPrefix(
+                    archivePath: filePath,
+                    directoryForContentPath: assetFolderPath,
+                    prefixName: assetName,
+                    searchForFileWithExtension: searchForFileWithExtension,
+                    contentIsFolder: contentIsFolder);
             }
         }
 
