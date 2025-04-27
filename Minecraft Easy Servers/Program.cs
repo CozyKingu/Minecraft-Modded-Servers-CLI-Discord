@@ -7,9 +7,9 @@ using Minecraft_Easy_Servers.Managers;
 
 bool debug = false;
 
-var configManager = new ConfigManager();
 var executeManager = new ExecuteManager();
 var commandManager = new CommandManager();
+var configManager = new ConfigManager(executeManager);
 var serverManger = new ServerManager(executeManager, commandManager);
 var commandLineRunner = new CLI(serverManger, configManager, executeManager);
 await SetupCommandLineRunner(args, commandLineRunner);

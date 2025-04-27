@@ -28,7 +28,7 @@ namespace Minecraft_Easy_Servers.Managers
             const string eulaAsset = "eula.txt";
             CopyAssetToFolder(GetFolderPath(name), eulaAsset);
 
-            await MinecraftDownloader.DownloadMinecraftServer(version, GetFolderPath(name));
+            await MinecraftDownloader.DownloadVanillaMinecraftServer(version, GetFolderPath(name));
             Console.WriteLine($"Download of server version {version} finished. Initializing server with first boot-up...");
 
             FirstRunServer(name);
@@ -120,7 +120,7 @@ namespace Minecraft_Easy_Servers.Managers
         private void FirstRunServer(string name)
         {
             string serverJar = GetServerJar(name);
-            executeManager.ExecuteJarAndStop(serverJar, "Done");
+            executeManager.ExecuteJarAndStop(serverJar, "Done", $"-Xmx1G -Xms1G -jar {Path.GetFileName(serverJar)} nogui");
         }
 
         public int GetPort(string name)

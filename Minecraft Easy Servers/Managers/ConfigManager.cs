@@ -9,16 +9,28 @@ namespace Minecraft_Easy_Servers.Managers
     public class ConfigManager
     {
         public const string FolderName = "configs";
-        public ConfigManager()
+        private readonly ExecuteManager executeManager;
+
+        public ConfigManager(ExecuteManager executeManager)
         {
+            this.executeManager = executeManager;
         }
 
-        public void CreateConfig(string name, string modloader, string version)
+        public async Task CreateConfig(string name, string modloader, string version)
         {
             if (ConfigExists(name))
                 throw new ManagerException($"Config with name {name} already exists. To remove it, run: $ remove-config {name}");
 
             Directory.CreateDirectory(GetFolderPath(name));
+
+            // Create baseServer directory
+            var baseServerPath = GetOrCreateBaseServerPath(name);
+
+            // Create baseClient directory
+            var baseManualClientPath = GetOrCreateBaseManualClientPath(name);
+
+            // Create baseMcClient directory
+            var baseMultiMCClientPath = GetOrCreateBaseMultiMCClientPath(name);
 
             // Create json database.
             var configJsonDb = new ConfigJsonDb
@@ -35,7 +47,76 @@ namespace Minecraft_Easy_Servers.Managers
 
             var configPath = GetConfigPath(name);
             File.WriteAllText(configPath, json);
+
+            // Downloading given modLoader
+            if (modloader.Equals("forge", StringComparison.OrdinalIgnoreCase))
+            {
+                var forgeInstaller = await MinecraftDownloader.DownloadForgeMinecraftUniversalInstaller(version, GetFolderPath(name));
+                Console.WriteLine($"Forge installer downloaded to {forgeInstaller}. Installing base server.");
+                var ack = executeManager.ExecuteJarAndStop(forgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(forgeInstaller)} --installServer {baseServerPath}");
+                if (!ack)
+                {
+                    Directory.Delete(GetFolderPath(name), true);
+                    throw new ManagerException($"Forge installation failed. Please check the logs for more details.");
+                }
+
+                // Copy the forge installer jar to the baseClient directory
+                var destinationPath = Path.Combine(baseManualClientPath, Path.GetFileName(forgeInstaller));
+                File.Copy(forgeInstaller, destinationPath, true);
+
+            }
+            else if (modloader.Equals("neoforge", StringComparison.OrdinalIgnoreCase))
+            {
+                var neoforgeInstaller = await MinecraftDownloader.DownloadNeoforgeMinecraftUniversalInstaller(version, GetFolderPath(name));
+                Console.WriteLine($"Neoforge installer downloaded to {neoforgeInstaller}. Installing base server.");
+                var ack = executeManager.ExecuteJarAndStop(neoforgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(neoforgeInstaller)} --server-jar --server-install {baseServerPath}");
+                if (!ack)
+                {
+                    Directory.Delete(GetFolderPath(name), true);
+                    throw new ManagerException($"Neoforge installation failed. Please check the logs for more details.");
+                }
+                // Copy the neoforge installer jar to the baseClient directory
+                var destinationPath = Path.Combine(baseManualClientPath, Path.GetFileName(neoforgeInstaller));
+
+                // Prepare MultiMC clients
+                var windowsMcClient = await MinecraftDownloader.DownloadMultiMCArchive("windows", baseMultiMCClientPath);
+                var linuxMcClient = await MinecraftDownloader.DownloadMultiMCArchive("linux", baseMultiMCClientPath);
+                var macMcClient = await MinecraftDownloader.DownloadMultiMCArchive("mac", baseMultiMCClientPath);
+
+                var windowsFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, windowsMcClient, "windows", searchForFileWithExtension: null, contentIsFolder: true);
+                var linuxFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, linuxMcClient, "linux", searchForFileWithExtension: null, contentIsFolder: true);
+                var macFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, macMcClient, "mac", searchForFileWithExtension: null, contentIsFolder: true);
+
+                // Add the project /Assets/MultiMC files in a new directory in instances corresponding to configname and version
+                var windowsMcClientPath = Path.Combine(windowsFolderMcClient, "instances", $"{name}_{version}");
+                var linuxMcClientPath = Path.Combine(linuxFolderMcClient, "instances", $"{name}_{version}");
+                var macMcClientPath = Path.Combine(macFolderMcClient, "instances", $"{name}_{version}");
+                Directory.CreateDirectory(windowsMcClientPath);
+                Directory.CreateDirectory(linuxMcClientPath);
+                Directory.CreateDirectory(macMcClientPath);
+
+
+                File.Copy(neoforgeInstaller, destinationPath, true);
+            }
+            else if (modloader.Equals("vanilla", StringComparison.OrdinalIgnoreCase))
+            {
+                var vanillaServerRunner = await MinecraftDownloader.DownloadVanillaMinecraftServer(version, GetFolderPath(name));
+                Console.WriteLine($"Vanilla server jar downloaded to {vanillaServerRunner}");
+            }
+            else
+            {
+                throw new ManagerException($"Modloader {modloader} is not supported.");
+            }
+
             Console.WriteLine($"Config {name} created.");
+        }
+
+        public ConfigJsonDb Read(string configName)
+        {
+            if (!ConfigExists(configName))
+                throw new ManagerException($"Config with name {configName} doesn't exist. To create it, run: $ add-config {configName}");
+
+            return JsonSerializer.Deserialize<ConfigJsonDb>(File.ReadAllText(GetConfigPath(configName))) ?? throw new ManagerException($"An error occured while deserializing config {configName}");
         }
 
         public void AddAsset(string name, string assetName, string link, string filePath, string collectionName)
@@ -346,7 +427,7 @@ namespace Minecraft_Easy_Servers.Managers
 
             if (Path.GetExtension(filePath).Equals(".zip", StringComparison.OrdinalIgnoreCase) && searchForFileWithExtension != ".zip")
             {
-                var contentPath = ArchiveHelper.ExtractZipAndIsolateContentAddPrefix(
+                var contentPath = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(
                     archivePath: filePath,
                     directoryForContentPath: assetFolderPath,
                     prefixName: assetName,
@@ -394,6 +475,44 @@ namespace Minecraft_Easy_Servers.Managers
 
 
             RemoveAsset(name, worldName, "worlds");
+        }
+        private static string GetOrCreateBaseManualClientPath(string name)
+        {
+            var path = GetBaseManualClientPath(name);
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            return path;
+        }
+
+        private static string GetOrCreateBaseMultiMCClientPath(string name)
+        {
+            var path = GetBaseMultiMCClientPath(name);
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            return path;
+        }
+
+        private static string GetOrCreateBaseServerPath(string name)
+        {
+            var path = GetBaseServerPath(name);
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            return path;
+        }
+
+        private static string GetBaseManualClientPath(string name)
+        {
+            return Path.Combine(GetFolderPath(name), "baseManualClient");
+        }
+
+        private static string GetBaseMultiMCClientPath(string name)
+        {
+            return Path.Combine(GetFolderPath(name), "baseMultiMCClient");
+        }
+
+        private static string GetBaseServerPath(string name)
+        {
+            return Path.Combine(GetFolderPath(name), "baseServer");
         }
     }
 }

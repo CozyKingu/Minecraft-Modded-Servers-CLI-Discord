@@ -29,10 +29,9 @@ namespace Minecraft_Easy_Servers
             await serverManager.CreateServer(options.Name, options.Version);
         }
 
-        public Task Run(AddConfig options)
+        public async Task Run(AddConfig options)
         {
-            configManager.CreateConfig(options.Name, options.ModLoader, options.Version);
-            return Task.CompletedTask;
+            await configManager.CreateConfig(options.Name, options.ModLoader, options.Version);
         }
 
         public async Task Run(CheckStatus options)

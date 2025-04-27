@@ -1,0 +1,10 @@
+{
+	"neoforgeVersions": "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge",
+	"neoforgeVersionMatchingRule": "1.{mineMinor}.{minePatch}.{last}[{-beta}]?",
+	"neoforgeDownloadJar": "https://maven.neoforged.net/releases/net/neoforged/neoforge/{neoforgeVersion}/{neoforgeVersion}-installer.jar",
+	"forgeVersionPage": "https://files.minecraftforge.net/net/minecraftforge/forge/index_{mineVersion}.html",
+	"forgeDownloadjar": "https://maven.minecraftforge.net/net/minecraftforge/forge/{version}/forge-{mineVersion}-{forgeVersion}-installer.jar",
+	"multiMCwin": "https://files.multimc.org/downloads/mmc-develop-win32.zip",
+	"multiMClinux": "https://files.multimc.org/downloads/mmc-develop-lin64.tar.gz",
+	"multiMCmac": "https://files.multimc.org/downloads/mmc-develop-osx64-5.15.2.tar.gz"
+}

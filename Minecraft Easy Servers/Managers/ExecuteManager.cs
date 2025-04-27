@@ -18,14 +18,12 @@ namespace Minecraft_Easy_Servers.Managers
         {
         }
 
-        public void ExecuteJarAndStop(string jarPath, string stopSubString)
+        public bool ExecuteJarAndStop(string jarPath, string stopSubString, string arguments)
         {
+            bool ack = false;
             var javaPath = FindJavaInPath();
             if (javaPath == null)
                 throw new ManagerException("Set java runtime in PATH for initializing the server");
-
-            var arguments = $"-Xmx1G -Xms1G -jar {Path.GetFileName(jarPath)} nogui";
-
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
@@ -48,12 +46,14 @@ namespace Minecraft_Easy_Servers.Managers
                 if (args.Data.Contains(stopSubString))
                 {
                     process.StandardInput.Write("stop\n");
+                    ack = true;
                 }
             };
 
             process.Start();
             process.BeginOutputReadLine();
             process.WaitForExit();
+            return ack;
         }
 
         public int? RunBackgroundJar(string jarPath, string ackSubString, string errorSubString, string javaArgument, string jarArgument, bool killIfAckFailed = false)
@@ -66,7 +66,7 @@ namespace Minecraft_Easy_Servers.Managers
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = GetShellFileName(),
-                    Arguments = GetShellArguments($"{javaArgument} -jar {Path.GetFileName(jarPath)} {jarArgument}"),
+                    Arguments = GetJavaShellArguments($"{javaArgument} -jar {Path.GetFileName(jarPath)} {jarArgument}"),
                     UseShellExecute = true,
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(jarPath),
@@ -119,7 +119,17 @@ namespace Minecraft_Easy_Servers.Managers
             };
         }
 
-        private string GetShellArguments(string arguments)
+        private string GetJavaShellArguments(string arguments)
+        {
+            var javaPath = FindJavaInPath() ?? throw new ManagerException("No java.exe found in JAVA_HOME");
+            return Environment.OSVersion.Platform switch
+            {
+                PlatformID.Win32NT => $"/C \"{javaPath}\" {arguments}",
+                _ => $"-c \"{javaPath}\" {arguments}"
+            };
+        }
+        
+        private string GetRunScriptShellArguments(string arguments)
         {
             var javaPath = FindJavaInPath() ?? throw new ManagerException("No java.exe found in JAVA_HOME");
             return Environment.OSVersion.Platform switch
