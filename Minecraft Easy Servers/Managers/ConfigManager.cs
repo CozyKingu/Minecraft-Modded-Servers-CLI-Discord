@@ -38,8 +38,9 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Config {name} created.");
         }
 
-        public void AddAsset(string name, string assetName, string link, string collectionName)
+        public void AddAsset(string name, string assetName, string link, string filePath, string collectionName)
         {
+            var isDownloaded = link.Contains("http") || link.Contains("https");
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var store = new DataStore(GetConfigPath(name));
@@ -50,7 +51,7 @@ namespace Minecraft_Easy_Servers.Managers
 
             var asset = new Asset()
             {
-                Link = link,
+                Link = isDownloaded ? link : "file:"+filePath,
                 Name = assetName
             };
 
@@ -60,9 +61,12 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddMod(string name, string modName, string link, ModTypeEnum modType)
         {
-            await DownloadOrCopyAssetAsync(configName: name, assetType: "mods", assetName: modName, assetLink: link, searchForFileWithExtension: ".jar");
+            var filePath = await DownloadOrCopyAssetAsync(configName: name, assetType: "mods", assetName: modName, assetLink: link, searchForFileWithExtension: ".jar");
 
-            AddAsset(name, modName, link, "mods");
+            if (string.IsNullOrEmpty(filePath))
+                throw new ManagerException($"Retrieving mod from {link} failed");
+
+            AddAsset(name, modName, link, filePath, "mods");
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
@@ -94,27 +98,31 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddPlugin(string name, string pluginName, string link)
         {
-            await DownloadOrCopyAssetAsync(
+            var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "plugins",
                 assetName: pluginName,
                 assetLink: link,
                 searchForFileWithExtension: ".jar",
                 contentIsFolder: false);
-            AddAsset(name, pluginName, link, "plugins");
+            if (string.IsNullOrEmpty(filePath))
+                throw new ManagerException($"Retrieving plugin from {link} failed");
+            AddAsset(name, pluginName, link, filePath, "plugins");
         }
 
         public async Task AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
-            await DownloadOrCopyAssetAsync(
+            var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "resourcePacks",
                 assetName: resourcePackName,
                 assetLink: link,
                 searchForFileWithExtension: ".zip",
                 contentIsFolder: false);
+            if (string.IsNullOrEmpty(filePath))
+                throw new ManagerException($"Retrieving resource pack from {link} failed");
 
-            AddAsset(name, resourcePackName, link, "resourcePacks");
+            AddAsset(name, resourcePackName, link, filePath, "resourcePacks");
 
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
@@ -137,15 +145,17 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddWorld(string name, string worldName, string link, bool isServerDefault = false)
         {
-            await DownloadOrCopyAssetAsync(
+            var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "worlds",
                 assetName: worldName,
                 assetLink: link,
                 searchForFileWithExtension: null,
                 contentIsFolder: true);
+            if (string.IsNullOrEmpty(filePath))
+                throw new ManagerException($"Retrieving world from {link} failed");
 
-            AddAsset(name, worldName, link, "worlds");
+            AddAsset(name, worldName, link, filePath, "worlds");
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
@@ -309,7 +319,7 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
-        private static async Task DownloadOrCopyAssetAsync(string configName, string assetType, string assetName, string assetLink, string? searchForFileWithExtension, bool contentIsFolder = false)
+        private static async Task<string?> DownloadOrCopyAssetAsync(string configName, string assetType, string assetName, string assetLink, string? searchForFileWithExtension, bool contentIsFolder = false)
         {
             var assetFolderPath = GetOrCreateAssetFolderPath(configName, assetType);
             string filePath;
@@ -324,8 +334,9 @@ namespace Minecraft_Easy_Servers.Managers
                 if (searchForFileWithExtension != null && assetLink.Contains(searchForFileWithExtension))
                 {
                     // Copy file and finish.
-                    File.Copy(assetLink, Path.Combine(assetFolderPath, Path.GetFileName(assetLink)), true);
-                    return;
+                    string destPath = Path.Combine(assetFolderPath, Path.GetFileName(assetLink));
+                    File.Copy(assetLink, destPath, true);
+                    return destPath;
                 }
                 else
                     filePath = assetLink;
@@ -341,7 +352,11 @@ namespace Minecraft_Easy_Servers.Managers
                     prefixName: assetName,
                     searchForFileWithExtension: searchForFileWithExtension,
                     contentIsFolder: contentIsFolder);
+                return contentPath;
             }
+
+            // No asset file found.
+            return null;
         }
 
         private static string GetOrCreateAssetFolderPath(string configName, string assetName)
