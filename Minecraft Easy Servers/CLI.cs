@@ -88,16 +88,14 @@ namespace Minecraft_Easy_Servers
             return Task.CompletedTask;
         }
 
-        public Task Run(AddPlugin options)
+        public async Task Run(AddPlugin options)
         {
-            configManager.AddPlugin(options.ConfigName, options.Name, options.Link);
-            return Task.CompletedTask;
+            await configManager.AddPlugin(options.ConfigName, options.Name, options.Link);
         }
 
-        public Task Run(AddResourcePack options)
+        public async Task Run(AddResourcePack options)
         {
-            configManager.AddResourcePack(options.ConfigName, options.Name, options.Link, options.ServerDefault);
-            return Task.CompletedTask;
+            await configManager.AddResourcePack(options.ConfigName, options.Name, options.Link, options.ServerDefault);
         }
 
         public Task Run(RemovePlugin options)
@@ -118,10 +116,9 @@ namespace Minecraft_Easy_Servers
             return Task.CompletedTask;
         }
 
-        public Task Run(AddWorld options)
+        public async Task Run(AddWorld options)
         {
-            configManager.AddWorld(options.ConfigName, options.Name, options.Link, options.ServerDefault);
-            return Task.CompletedTask;
+            await configManager.AddWorld(options.ConfigName, options.Name, options.Link, options.ServerDefault);
         }
     }
 }

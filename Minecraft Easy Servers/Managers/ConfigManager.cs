@@ -92,13 +92,28 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Mod {modName} added to {modType.ToString().ToLower()} configuration for {name}.");
         }
 
-        public void AddPlugin(string name, string pluginName, string link)
+        public async Task AddPlugin(string name, string pluginName, string link)
         {
+            await DownloadOrCopyAssetAsync(
+                configName: name,
+                assetType: "plugins",
+                assetName: pluginName,
+                assetLink: link,
+                searchForFileWithExtension: ".jar",
+                contentIsFolder: false);
             AddAsset(name, pluginName, link, "plugins");
         }
 
-        public void AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
+        public async Task AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
+            await DownloadOrCopyAssetAsync(
+                configName: name,
+                assetType: "resourcePacks",
+                assetName: resourcePackName,
+                assetLink: link,
+                searchForFileWithExtension: ".zip",
+                contentIsFolder: false);
+
             AddAsset(name, resourcePackName, link, "resourcePacks");
 
             var configPath = GetConfigPath(name);
@@ -120,15 +135,22 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
-        public void AddWorld(string name, string worldName, string link, bool isServerDefault = false)
+        public async Task AddWorld(string name, string worldName, string link, bool isServerDefault = false)
         {
+            await DownloadOrCopyAssetAsync(
+                configName: name,
+                assetType: "worlds",
+                assetName: worldName,
+                assetLink: link,
+                searchForFileWithExtension: null,
+                contentIsFolder: true);
+
             AddAsset(name, worldName, link, "worlds");
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
             if (isServerDefault)
             {
-
                 // Update the server.default_world property
                 var config = store.GetItem<ServerConfig>("server");
                 config.DefaultWorld = worldName;
@@ -178,6 +200,30 @@ namespace Minecraft_Easy_Servers.Managers
 
             if (existingAsset == null)
                 throw new ManagerException($"{collectionName} with name {assetName} doesn't exist. To add it, run: $ add-{collectionName.ToLower()} {name} {assetName}");
+
+            var assetPath = GetOrCreateAssetFolderPath(name, collectionName);
+            // Remove asset file or asset directory to assetPath/assetName
+            var assetFilePath = Path.Combine(assetPath, assetName);
+            var matchingFiles = Directory.GetFiles(assetPath, $"{assetName}_*");
+            var matchingDirectories = Directory.GetDirectories(assetPath, $"{assetName}_*");
+            if (matchingFiles.Any())
+            {
+                foreach (var file in matchingFiles)
+                {
+                    File.Delete(file);
+                }
+            }
+            else if (matchingDirectories.Any())
+            {
+                foreach (var directory in matchingDirectories)
+                {
+                    Directory.Delete(directory, true);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"Warning: Asset {assetName} not found in {assetPath}.");
+            }
 
             collection.DeleteOne(x => x.Name.Equals(assetName));
             Console.WriteLine($"{collectionName} {assetName} removed from config {name}.");
@@ -305,41 +351,6 @@ namespace Minecraft_Easy_Servers.Managers
                 Directory.CreateDirectory(assetFolderPath);
 
             return assetFolderPath;
-        }
-
-        public async Task SetupConfigAsync(string name)
-        {
-            if (!ConfigExists(name))
-                throw new ManagerException($"Config with name {name} doesn't exist. To create it, run: $ add-config {name}");
-
-            var configPath = GetConfigPath(name);
-            var store = new DataStore(configPath);
-
-            //// Download mods
-            //await DownloadAssetsAsync(configName: name, assetName: "mods", targetSubFolder: "mods", searchForFileWithExtension: ".jar");
-
-            //// Download plugins
-            //await DownloadAssetsAsync(configName: name, assetName: "plugins", targetSubFolder: "plugins", searchForFileWithExtension: ".jar");
-
-            //// Download resource packs
-            //await DownloadAssetsAsync(configName: name, assetName: "resourcePacks", targetSubFolder: "resourcePacks", searchForFileWithExtension: ".zip");
-
-            //// Download worlds
-            //await DownloadAssetsAsync(configName: name, assetName: "worlds", targetSubFolder: "worlds", null, extractOnly: true);
-
-            Console.WriteLine($"Config {name} setup completed. All assets have been downloaded.");
-        }
-
-        private static async Task<string> DownloadAssetAsync(Asset asset, string targetFolder)
-        {
-            Directory.CreateDirectory(targetFolder);
-            var targetFilePath = Path.Combine(targetFolder, asset.Name);
-
-            var link = asset.Link;
-            var filePath = await MinecraftDownloader.DownloadFile(targetFolder, link);
-
-            Console.WriteLine($"Downloaded {filePath} for asset {asset.Name} to {targetFolder}.");
-            return filePath;
         }
 
         public void RemoveWorld(string name, string worldName)
