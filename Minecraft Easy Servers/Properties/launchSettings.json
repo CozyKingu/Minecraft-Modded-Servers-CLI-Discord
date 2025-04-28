@@ -4,13 +4,21 @@
       "commandName": "Project",
       "commandLineArgs": " add-server server2 -v 1.21.3"
     },
-    "Down server 1": {
+    "Down server 2": {
       "commandName": "Project",
-      "commandLineArgs": "down server1"
+      "commandLineArgs": "down server2"
     },
-    "Up server 1": {
+    "Up server 2": {
       "commandName": "Project",
-      "commandLineArgs": "up server1 25566"
+      "commandLineArgs": "up server2 25566"
+    },
+    "Create server 2": {
+      "commandName": "Project",
+      "commandLineArgs": "add-server server2 -c configtest"
+    },
+    "Remove server 2": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-server server2"
     },
     "Status server 1": {
       "commandName": "Project",

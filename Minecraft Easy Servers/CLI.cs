@@ -26,7 +26,7 @@ namespace Minecraft_Easy_Servers
 
         public async Task Run(AddServer options)
         {
-            await serverManager.CreateServer(options.Name, options.Version);
+            await serverManager.CreateServer(options.Name, options.Config);
         }
 
         public async Task Run(AddConfig options)

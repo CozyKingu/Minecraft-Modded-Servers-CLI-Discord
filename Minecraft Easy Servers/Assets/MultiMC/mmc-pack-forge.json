@@ -17,7 +17,7 @@
       ],
       "uid": "net.minecraftforge",
       "version": "{forgeVersion}",
-      "cachedVersion": "{forgeVersion}",
+      "cachedVersion": "{forgeVersion}"
     }
   ],
   "formatVersion": 1

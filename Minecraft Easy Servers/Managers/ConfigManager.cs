@@ -63,6 +63,10 @@
             // Create baseClient directory
             var baseDIYClientPath = GetOrCreateBaseDIYClientPath(name);
 
+            Directory.CreateDirectory(GetDIYClientAssetPath(name, "saves"));
+            Directory.CreateDirectory(GetDIYClientAssetPath(name, "resourcepacks"));
+            Directory.CreateDirectory(GetDIYClientAssetPath(name, "mods"));
+
             // Create baseMcClient directory
             var baseMultiMCClientPath = GetOrCreateBaseMultiMCClientPath(name);
 
@@ -188,7 +192,7 @@
                 Directory.CreateDirectory(minecraftPath);
                 Directory.CreateDirectory(Path.Combine(minecraftPath, "mods"));
                 Directory.CreateDirectory(Path.Combine(minecraftPath, "resourcepacks"));
-                Directory.CreateDirectory(Path.Combine(minecraftPath, "worlds"));
+                Directory.CreateDirectory(Path.Combine(minecraftPath, "saves"));
 
                 File.Copy(Path.Combine(AssetsFolder, "MultiMC", "instance.cfg"), Path.Combine(mcClientNewInstancePath, "instance.cfg"), true);
                 ReplaceInstanceName(Path.Combine(mcClientNewInstancePath, "instance.cfg"), $"{name}_{version}");
@@ -223,12 +227,13 @@
         public void AddAssetToClient(string name, string version, string assetType, string assetName, string assetPath)
         {
             var osList = new[] { "windows", "linux", "mac" };
+            var assetFolder = GetFolderNameFromAssetTypeClient(assetType);
 
             foreach (var os in osList)
             {
                 // Handle MultiMC client
                 string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
-                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType.ToLower());
+                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetFolder);
                 if (!Directory.Exists(multiMCInstanceAssetPath))
                     throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
 
@@ -236,10 +241,10 @@
             }
 
             // Handle DIY client
-            string diyClientAssetPath = GetOrCreateDIYClientAssetPath(name, assetType);
+            string diyClientAssetPath = GetOrCreateDIYClientAssetPath(name, assetFolder);
             CopyAsset(assetPath, diyClientAssetPath);
 
-            Console.WriteLine($"Asset {assetName} added to {assetType} for all clients.");
+            Console.WriteLine($"Asset {assetName} added to {assetFolder} for all clients.");
         }
 
         /// <summary>
@@ -248,9 +253,9 @@
         /// <param name="name">The name<see cref="string"/></param>
         /// <param name="assetType">The assetType<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetOrCreateDIYClientAssetPath(string name, string assetType)
+        private static string GetOrCreateDIYClientAssetPath(string name, string assetFolder)
         {
-            string diyClientAssetPath = GetDIYClientAssetPath(name, assetType);
+            string diyClientAssetPath = GetDIYClientAssetPath(name, assetFolder);
             if (!Directory.Exists(diyClientAssetPath))
                 Directory.CreateDirectory(diyClientAssetPath);
             return diyClientAssetPath;
@@ -260,11 +265,11 @@
         /// The GetDIYClientAssetPath
         /// </summary>
         /// <param name="name">The name<see cref="string"/></param>
-        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetFolder">The assetType<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetDIYClientAssetPath(string name, string assetType)
+        private static string GetDIYClientAssetPath(string name, string assetFolder)
         {
-            return Path.Combine(GetBaseManualClientPath(name), assetType.ToLower());
+            return Path.Combine(GetBaseManualClientPath(name), assetFolder.ToLower());
         }
 
         /// <summary>
@@ -276,13 +281,14 @@
         /// <param name="assetName">The assetName<see cref="string"/></param>
         public void RemoveAssetFromClient(string name, string version, string assetType, string assetName)
         {
+            var assetFolder = GetFolderNameFromAssetTypeClient(assetType);
             var osList = new[] { "windows", "linux", "mac" };
 
             foreach (var os in osList)
             {
                 // Handle MultiMC client
                 string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
-                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType);
+                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetFolder);
                 if (!Directory.Exists(multiMCInstanceAssetPath))
                     throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
 
@@ -290,13 +296,13 @@
             }
 
             // Handle DIY client
-            var diyClientAssetPath = GetDIYClientAssetPath(name, assetType);
+            var diyClientAssetPath = GetDIYClientAssetPath(name, assetFolder);
             if (!Directory.Exists(diyClientAssetPath))
                 throw new ManagerException($"DIY asset client path for {name} does not exist. Ensure the client is prepared.");
 
             RemoveAsset(diyClientAssetPath, assetName);
 
-            Console.WriteLine($"Asset {assetName} removed from {assetType} for all clients.");
+            Console.WriteLine($"Asset {assetName} removed from {assetFolder} for all clients.");
         }
 
         /// <summary>
@@ -304,7 +310,7 @@
         /// </summary>
         /// <param name="sourcePath">The sourcePath<see cref="string"/></param>
         /// <param name="destinationPath">The destinationPath<see cref="string"/></param>
-        private static void CopyAsset(string sourcePath, string destinationPath)
+        private static void CopyAsset(string sourcePath, string destinationPath, bool destinationIsTheCopiedAsset = false)
         {
             if (File.Exists(sourcePath))
             {
@@ -314,8 +320,9 @@
             {
                 if (Directory.Exists(destinationPath))
                     Directory.Delete(destinationPath, true);
-                var copiedFolderPath = Path.Combine(destinationPath, Path.GetFileName(sourcePath));
-                Directory.CreateDirectory(Path.Combine(destinationPath, Path.GetFileName(sourcePath)));
+                var copiedFolderPath = destinationIsTheCopiedAsset ? destinationPath : Path.Combine(destinationPath, Path.GetFileName(sourcePath));
+                if (!Directory.Exists(copiedFolderPath))
+                    Directory.CreateDirectory(copiedFolderPath);
 
                 foreach (var dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
                 {
@@ -365,7 +372,7 @@
             // Si aucun fichier ou dossier correspondant n'est trouvé, lever une exception
             if (!matchingFiles.Any() && !matchingDirectories.Any())
             {
-                Console.Write($"Warning: Asset {assetName} not found in {assetPath}.");
+                Console.WriteLine($"Warning: Asset {assetName} not found in {assetPath}.");
             }
         }
 
@@ -382,9 +389,9 @@
             var baseServerPath = GetBaseServerPath(name);
             if (!Directory.Exists(baseServerPath))
                 throw new ManagerException($"Base server path for {name} does not exist. Ensure the server is prepared.");
-            var baseServerAssetPath = GetOrCreateBaseServerAssetPath(name, assetType);
-            // TODO: Tester avec tous les types d'assets, puis s'attaquer aux serveurs pour récup baseServer
-            CopyAsset(assetPath, baseServerAssetPath);
+            string assetFolderName = assetType.ToLower();
+            var baseServerAssetPath = assetType == "worlds" ? Path.Combine(GetBaseServerPath(name), Path.GetFileName(assetPath)) : GetOrCreateBaseServerAssetPath(name, assetFolderName);
+            CopyAsset(assetPath, baseServerAssetPath, destinationIsTheCopiedAsset: assetType == "worlds");
         }
 
         // Remove Asset from baseServer directory (no .minecraft)
@@ -400,7 +407,13 @@
             var baseServerPath = GetBaseServerPath(name);
             if (!Directory.Exists(baseServerPath))
                 throw new ManagerException($"Base server path for {name} does not exist. Ensure the server is prepared.");
-            var baseServerAssetPath = GetBaseServerAssetPath(name, assetType);
+            string assetFolder = assetType.ToLower();
+            var baseServerAssetPath = assetType == "worlds" ? GetBaseServerPath(name) :  GetBaseServerAssetPath(name, assetFolder);
+            if (!Directory.Exists(baseServerAssetPath))
+            {
+                Console.WriteLine($"Base server asset path for {name} does not exist.");
+                return;
+            }
 
             RemoveAsset(baseServerAssetPath, assetName);
         }
@@ -479,10 +492,12 @@
                 throw new ManagerException($"{assetType} with name {assetName} already exists. To remove it, run: $ remove-{assetType.ToLower()} {configName} {assetName}");
 
             // Add asset to base server
-            AddAssetToBaseServer(configName, filePath, assetType);
+            if (addToServer)
+                AddAssetToBaseServer(configName, filePath, assetType);
 
             // Add asset to clients
-            AddAssetToClient(configName, Read(configName).Version, assetType, assetName, filePath);
+            if (addToClient)
+                AddAssetToClient(configName, Read(configName).Version, assetType, assetName, filePath);
 
             var asset = new Asset()
             {
@@ -640,7 +655,7 @@
             if (string.IsNullOrEmpty(filePath))
                 throw new ManagerException($"Retrieving world from {link} failed");
 
-            if (isServerDefault)
+            if (isServerDefault && !string.IsNullOrEmpty(Read(name).Server.DefaultWorld))
             {
                 // Removing default resource pack from server config.
                 RemoveAssetFromBaseServer(name, "worlds", Read(name).Server.DefaultWorld);
@@ -697,7 +712,7 @@
         /// </summary>
         /// <param name="name">The name<see cref="string"/></param>
         /// <returns>The <see cref="bool"/></returns>
-        private static bool ConfigExists(string name)
+        public static bool ConfigExists(string name)
         {
             return Directory.Exists(GetFolderPath(name));
         }
@@ -852,26 +867,6 @@
             return collection.AsQueryable().ToList();
         }
 
-        // Download mods
-
-        /// <summary>
-        /// The DownloadAssetsAsync
-        /// </summary>
-        /// <param name="configName">The configName<see cref="string"/></param>
-        /// <param name="assetName">The assetName<see cref="string"/></param>
-        /// <param name="searchForFileWithExtension">The searchForFileWithExtension<see cref="string?"/></param>
-        /// <param name="extractOnly">The extractOnly<see cref="bool"/></param>
-        /// <returns>The <see cref="Task"/></returns>
-        private async Task DownloadAssetsAsync(string configName, string assetName, string? searchForFileWithExtension = null, bool extractOnly = false)
-        {
-            var assets = ListAssets(configName, assetName)
-                .Where(x => x.Link.Contains("http") || x.Link.Contains("https"));
-            foreach (var asset in assets)
-            {
-                await DownloadOrCopyAssetAsync(configName, assetName, "", asset.Link, searchForFileWithExtension, extractOnly);
-            }
-        }
-
         /// <summary>
         /// The DownloadOrCopyAssetAsync
         /// </summary>
@@ -985,20 +980,20 @@
         /// <summary>
         /// The GetOrCreateBaseServerAssetPath
         /// </summary>
-        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetFolderName">The assetType<see cref="string"/></param>
         /// <param name="baseServerPath">The baseServerPath<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetOrCreateBaseServerAssetPath(string configName, string assetType)
+        private static string GetOrCreateBaseServerAssetPath(string configName, string assetFolderName)
         {
-            var serverAssetPath = GetBaseServerAssetPath(configName, assetType);
+            var serverAssetPath = GetBaseServerAssetPath(configName, assetFolderName);
             if (!Directory.Exists(serverAssetPath))
                 Directory.CreateDirectory(serverAssetPath);
             return serverAssetPath;
         }
 
-        private static string GetBaseServerAssetPath(string configName, string assetType)
+        private static string GetBaseServerAssetPath(string configName, string assetFolderName)
         {
-            return Path.Combine(GetBaseServerPath(configName), assetType.ToLower());
+            return Path.Combine(GetBaseServerPath(configName), assetFolderName);
         }
 
         /// <summary>
@@ -1027,12 +1022,21 @@
             return path;
         }
 
+        private static string GetFolderNameFromAssetTypeClient(string assetType)
+        {
+            return assetType.ToLower() switch
+            {
+                "worlds" => "saves",
+                _ => assetType.ToLower()
+            };
+        }
+
         /// <summary>
         /// The GetBaseManualClientPath
         /// </summary>
         /// <param name="name">The name<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetBaseManualClientPath(string name)
+        public static string GetBaseManualClientPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseManualClient");
         }
@@ -1042,7 +1046,7 @@
         /// </summary>
         /// <param name="name">The name<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetBaseMultiMCClientPath(string name)
+        public static string GetBaseMultiMCClientPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseMultiMCClient");
         }
@@ -1052,7 +1056,7 @@
         /// </summary>
         /// <param name="name">The name<see cref="string"/></param>
         /// <returns>The <see cref="string"/></returns>
-        private static string GetBaseServerPath(string name)
+        public static string GetBaseServerPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseServer");
         }

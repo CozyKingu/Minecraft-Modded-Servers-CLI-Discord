@@ -10,7 +10,7 @@ bool debug = false;
 var executeManager = new ExecuteManager();
 var commandManager = new CommandManager();
 var configManager = new ConfigManager(executeManager);
-var serverManger = new ServerManager(executeManager, commandManager);
+var serverManger = new ServerManager(executeManager, commandManager, configManager);
 var commandLineRunner = new CLI(serverManger, configManager, executeManager);
 await SetupCommandLineRunner(args, commandLineRunner);
 
