@@ -91,7 +91,7 @@ namespace Minecraft_Easy_Servers.Helpers
                 var file = files.FirstOrDefault(x => searchForFileWithExtension == null || Path.GetExtension(x) == searchForFileWithExtension) ?? throw new Exception($"File with extension {searchForFileWithExtension ?? string.Empty} not found");
                 string fileName = Path.GetFileName(file);
                 string destinationPath = Path.Combine(directoryForContentPath, $"{prefixName}_{fileName}");
-                File.Move(file, destinationPath);
+                File.Move(file, destinationPath, overwrite: true);
                 Directory.Delete(extractedFolderPath, true);
                 return destinationPath;
             }

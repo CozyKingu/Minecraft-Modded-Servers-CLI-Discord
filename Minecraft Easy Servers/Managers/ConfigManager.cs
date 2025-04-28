@@ -1,21 +1,47 @@
-﻿using JsonFlatFileDataStore;
-using Minecraft_Easy_Servers.Exceptions;
-using Minecraft_Easy_Servers.Helpers;
-using Minecraft_Easy_Servers.Managers.Models;
-using System.Text.Json;
-
-namespace Minecraft_Easy_Servers.Managers
+﻿namespace Minecraft_Easy_Servers.Managers
 {
+    using JsonFlatFileDataStore;
+    using Minecraft_Easy_Servers.Exceptions;
+    using Minecraft_Easy_Servers.Helpers;
+    using Minecraft_Easy_Servers.Managers.Models;
+    using System.Text.Json;
+
+    /// <summary>
+    /// Defines the <see cref="ConfigManager" />
+    /// </summary>
     public class ConfigManager
     {
+        /// <summary>
+        /// Defines the FolderName
+        /// </summary>
         public const string FolderName = "configs";
+
+        /// <summary>
+        /// Defines the executeManager
+        /// </summary>
         private readonly ExecuteManager executeManager;
 
+        /// <summary>
+        /// Defines the AssetsFolder
+        /// </summary>
+        private const string AssetsFolder = "Assets";
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConfigManager"/> class.
+        /// </summary>
+        /// <param name="executeManager">The executeManager<see cref="ExecuteManager"/></param>
         public ConfigManager(ExecuteManager executeManager)
         {
             this.executeManager = executeManager;
         }
 
+        /// <summary>
+        /// The CreateConfig
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="modloader">The modloader<see cref="string"/></param>
+        /// <param name="version">The version<see cref="string"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         public async Task CreateConfig(string name, string modloader, string version)
         {
             if (ConfigExists(name))
@@ -26,8 +52,16 @@ namespace Minecraft_Easy_Servers.Managers
             // Create baseServer directory
             var baseServerPath = GetOrCreateBaseServerPath(name);
 
+            // copy eula.txt to baseServer directory
+            var eulaPath = Path.Combine(AssetsFolder, "eula.txt");
+            if (!File.Exists(eulaPath))
+            {
+                throw new ManagerException($"EULA file not found in {baseServerPath}. Please check the installation.");
+            }
+            File.Copy(eulaPath, Path.Combine(GetFolderPath(name), "eula.txt"), true);
+
             // Create baseClient directory
-            var baseManualClientPath = GetOrCreateBaseManualClientPath(name);
+            var baseDIYClientPath = GetOrCreateBaseDIYClientPath(name);
 
             // Create baseMcClient directory
             var baseMultiMCClientPath = GetOrCreateBaseMultiMCClientPath(name);
@@ -48,69 +82,372 @@ namespace Minecraft_Easy_Servers.Managers
             var configPath = GetConfigPath(name);
             File.WriteAllText(configPath, json);
 
-            // Downloading given modLoader
-            if (modloader.Equals("forge", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                var forgeInstaller = await MinecraftDownloader.DownloadForgeMinecraftUniversalInstaller(version, GetFolderPath(name));
-                Console.WriteLine($"Forge installer downloaded to {forgeInstaller}. Installing base server.");
-                var ack = executeManager.ExecuteJarAndStop(forgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(forgeInstaller)} --installServer {baseServerPath}");
-                if (!ack)
+                // Downloading given modLoader
+                if (modloader.Equals("forge", StringComparison.OrdinalIgnoreCase))
                 {
-                    Directory.Delete(GetFolderPath(name), true);
-                    throw new ManagerException($"Forge installation failed. Please check the logs for more details.");
+                    var forgeInstaller = await MinecraftDownloader.DownloadForgeMinecraftUniversalInstaller(version, GetFolderPath(name));
+                    // Extract forge version from forgeInstaller path when path contains forge-{mineVersion}-{forgeVersion}-installer.jar
+                    var forgeVersion = Path.GetFileName(forgeInstaller).Split('-')[2];
+
+                    Console.WriteLine($"Forge installer downloaded to {forgeInstaller}. Installing base server.");
+                    var ack = executeManager.ExecuteJarAndStop(forgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(forgeInstaller)} --installServer {baseServerPath}");
+                    if (!ack)
+                    {
+                        Directory.Delete(GetFolderPath(name), true);
+                        throw new ManagerException($"Forge installation failed. Please check the logs for more details.");
+                    }
+
+                    // Copy the forge installer jar to the baseClient directory
+                    var destinationPath = Path.Combine(baseDIYClientPath, Path.GetFileName(forgeInstaller));
+                    File.Copy(forgeInstaller, destinationPath, true);
+
+                    await PrepareMultiMCClients(
+                        name: name,
+                        modloader: modloader,
+                        modloaderVersion: forgeVersion,
+                        version: version,
+                        baseMultiMCClientPath: baseMultiMCClientPath);
+
+                }
+                else if (modloader.Equals("neoforge", StringComparison.OrdinalIgnoreCase))
+                {
+                    var neoforgeInstaller = await MinecraftDownloader.DownloadNeoforgeMinecraftUniversalInstaller(version, GetFolderPath(name));
+                    // Extract neoforge version from neoforgeInstaller path when path contains neoforge-{neoforgeVersion}-installer.jar
+                    var neoforgeVersion = Path.GetFileName(neoforgeInstaller).Split('-')[1];
+
+                    Console.WriteLine($"Neoforge installer downloaded to {neoforgeInstaller}. Installing base server.");
+                    var ack = executeManager.ExecuteJarAndStop(neoforgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(neoforgeInstaller)} --server-jar --install-server {baseServerPath}");
+                    if (!ack)
+                    {
+                        Directory.Delete(GetFolderPath(name), true);
+                        throw new ManagerException($"Neoforge installation failed. Please check the logs for more details.");
+                    }
+
+                    // Copy the neoforge installer jar to the baseClient directory
+                    var destinationPath = Path.Combine(baseDIYClientPath, Path.GetFileName(neoforgeInstaller));
+                    File.Copy(neoforgeInstaller, destinationPath, true);
+
+                    await PrepareMultiMCClients(
+                        name: name,
+                        modloader: modloader,
+                        modloaderVersion: neoforgeVersion,
+                        version: version,
+                        baseMultiMCClientPath: baseMultiMCClientPath);
+
+                }
+                else if (modloader.Equals("vanilla", StringComparison.OrdinalIgnoreCase))
+                {
+                    var vanillaServerRunner = await MinecraftDownloader.DownloadVanillaMinecraftServer(version, baseServerPath);
+                    Console.WriteLine($"Vanilla server jar downloaded to {vanillaServerRunner}");
+                    await PrepareMultiMCClients(name, modloader, version, "", baseMultiMCClientPath);
+                }
+                else
+                {
+                    throw new ManagerException($"Modloader {modloader} is not supported.");
                 }
 
-                // Copy the forge installer jar to the baseClient directory
-                var destinationPath = Path.Combine(baseManualClientPath, Path.GetFileName(forgeInstaller));
-                File.Copy(forgeInstaller, destinationPath, true);
-
+                Console.WriteLine($"Config {name} created.");
             }
-            else if (modloader.Equals("neoforge", StringComparison.OrdinalIgnoreCase))
+            catch (Exception ex)
             {
-                var neoforgeInstaller = await MinecraftDownloader.DownloadNeoforgeMinecraftUniversalInstaller(version, GetFolderPath(name));
-                Console.WriteLine($"Neoforge installer downloaded to {neoforgeInstaller}. Installing base server.");
-                var ack = executeManager.ExecuteJarAndStop(neoforgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(neoforgeInstaller)} --server-jar --server-install {baseServerPath}");
-                if (!ack)
+                // Clean up in case of failure
+                Directory.Delete(GetFolderPath(name), true);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// The PrepareMultiMCClients
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="modloader">The modloader<see cref="string"/></param>
+        /// <param name="modloaderVersion">The modloaderVersion<see cref="string"/></param>
+        /// <param name="version">The version<see cref="string"/></param>
+        /// <param name="baseMultiMCClientPath">The baseMultiMCClientPath<see cref="string"/></param>
+        /// <returns>The <see cref="Task"/></returns>
+        private static async Task PrepareMultiMCClients(string name, string modloader, string modloaderVersion, string version, string baseMultiMCClientPath)
+        {
+            Console.WriteLine("Preparing MultiMC clients...");
+
+            // Prepare MultiMC clients for each OS
+            var osList = new[] { "windows", "linux", "mac" };
+            var osClientPaths = new Dictionary<string, string>();
+
+            foreach (var os in osList)
+            {
+                var mcClient = await MinecraftDownloader.DownloadMultiMCArchive(os, baseMultiMCClientPath);
+                var folderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(mcClient, baseMultiMCClientPath, os, searchForFileWithExtension: null, contentIsFolder: true);
+
+                var mcClientNewInstancePath = Path.Combine(folderMcClient, "instances", $"{name}_{version}");
+                Directory.CreateDirectory(mcClientNewInstancePath);
+
+                // Create .minecraft and subdirectories
+                var minecraftPath = Path.Combine(mcClientNewInstancePath, ".minecraft");
+                Directory.CreateDirectory(minecraftPath);
+                Directory.CreateDirectory(Path.Combine(minecraftPath, "mods"));
+                Directory.CreateDirectory(Path.Combine(minecraftPath, "resourcepacks"));
+                Directory.CreateDirectory(Path.Combine(minecraftPath, "worlds"));
+
+                File.Copy(Path.Combine(AssetsFolder, "MultiMC", "instance.cfg"), Path.Combine(mcClientNewInstancePath, "instance.cfg"), true);
+                ReplaceInstanceName(Path.Combine(mcClientNewInstancePath, "instance.cfg"), $"{name}_{version}");
+
+                osClientPaths[os] = mcClientNewInstancePath;
+            }
+
+            var mmcPackPath = Path.Combine(AssetsFolder, "MultiMC", $"mmc-pack-{modloader}.json");
+
+            // Replace Minecraft version and modloader version in mmc-pack.json
+            var tempMmcPackPath = Path.GetTempFileName();
+            File.Copy(mmcPackPath, tempMmcPackPath, true);
+            ReplaceMinecraftVersion(tempMmcPackPath, version);
+            ReplaceModLoaderVersion(tempMmcPackPath, modloader, modloaderVersion);
+
+            foreach (var os in osList)
+            {
+                File.Copy(tempMmcPackPath, Path.Combine(osClientPaths[os], "mmc-pack.json"), true);
+            }
+
+            File.Delete(tempMmcPackPath);
+        }
+
+        /// <summary>
+        /// The AddAssetToClient
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="version">The version<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <param name="assetPath">The assetPath<see cref="string"/></param>
+        public void AddAssetToClient(string name, string version, string assetType, string assetName, string assetPath)
+        {
+            var osList = new[] { "windows", "linux", "mac" };
+
+            foreach (var os in osList)
+            {
+                // Handle MultiMC client
+                string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
+                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType);
+                if (!Directory.Exists(multiMCInstanceAssetPath))
+                    throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
+
+                CopyAsset(assetPath, multiMCInstanceAssetPath);
+            }
+
+            // Handle DIY client
+            string diyClientAssetPath = GetOrCreateDIYClientAssetPath(name, assetType);
+            CopyAsset(assetPath, diyClientAssetPath);
+
+            Console.WriteLine($"Asset {assetName} added to {assetType} for all clients.");
+        }
+
+        /// <summary>
+        /// The GetOrCreateDIYClientAssetPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string GetOrCreateDIYClientAssetPath(string name, string assetType)
+        {
+            string diyClientAssetPath = GetDIYClientAssetPath(name, assetType);
+            if (!Directory.Exists(diyClientAssetPath))
+                Directory.CreateDirectory(diyClientAssetPath);
+            return diyClientAssetPath;
+        }
+
+        /// <summary>
+        /// The GetDIYClientAssetPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string GetDIYClientAssetPath(string name, string assetType)
+        {
+            return Path.Combine(GetBaseManualClientPath(name), assetType);
+        }
+
+        /// <summary>
+        /// The RemoveAssetFromClient
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="version">The version<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        public void RemoveAssetFromClient(string name, string version, string assetType, string assetName)
+        {
+            var osList = new[] { "windows", "linux", "mac" };
+
+            foreach (var os in osList)
+            {
+                // Handle MultiMC client
+                string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
+                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType);
+                if (!Directory.Exists(multiMCInstanceAssetPath))
+                    throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
+
+                RemoveAsset(multiMCInstanceAssetPath, assetName);
+            }
+
+            // Handle DIY client
+            var diyClientAssetPath = GetDIYClientAssetPath(name, assetType);
+            if (!Directory.Exists(diyClientAssetPath))
+                throw new ManagerException($"DIY asset client path for {name} does not exist. Ensure the client is prepared.");
+
+            RemoveAsset(diyClientAssetPath, assetName);
+
+            Console.WriteLine($"Asset {assetName} removed from {assetType} for all clients.");
+        }
+
+        /// <summary>
+        /// The CopyAsset
+        /// </summary>
+        /// <param name="sourcePath">The sourcePath<see cref="string"/></param>
+        /// <param name="destinationPath">The destinationPath<see cref="string"/></param>
+        private static void CopyAsset(string sourcePath, string destinationPath)
+        {
+            if (File.Exists(sourcePath))
+            {
+                File.Copy(sourcePath, Path.Combine(destinationPath, Path.GetFileName(sourcePath)), true);
+            }
+            else if (Directory.Exists(sourcePath))
+            {
+                if (Directory.Exists(destinationPath))
+                    Directory.Delete(destinationPath, true);
+                Directory.CreateDirectory(destinationPath);
+
+                foreach (var dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
                 {
-                    Directory.Delete(GetFolderPath(name), true);
-                    throw new ManagerException($"Neoforge installation failed. Please check the logs for more details.");
+                    Directory.CreateDirectory(dirPath.Replace(sourcePath, destinationPath));
                 }
-                // Copy the neoforge installer jar to the baseClient directory
-                var destinationPath = Path.Combine(baseManualClientPath, Path.GetFileName(neoforgeInstaller));
 
-                // Prepare MultiMC clients
-                var windowsMcClient = await MinecraftDownloader.DownloadMultiMCArchive("windows", baseMultiMCClientPath);
-                var linuxMcClient = await MinecraftDownloader.DownloadMultiMCArchive("linux", baseMultiMCClientPath);
-                var macMcClient = await MinecraftDownloader.DownloadMultiMCArchive("mac", baseMultiMCClientPath);
-
-                var windowsFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, windowsMcClient, "windows", searchForFileWithExtension: null, contentIsFolder: true);
-                var linuxFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, linuxMcClient, "linux", searchForFileWithExtension: null, contentIsFolder: true);
-                var macFolderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(destinationPath, macMcClient, "mac", searchForFileWithExtension: null, contentIsFolder: true);
-
-                // Add the project /Assets/MultiMC files in a new directory in instances corresponding to configname and version
-                var windowsMcClientPath = Path.Combine(windowsFolderMcClient, "instances", $"{name}_{version}");
-                var linuxMcClientPath = Path.Combine(linuxFolderMcClient, "instances", $"{name}_{version}");
-                var macMcClientPath = Path.Combine(macFolderMcClient, "instances", $"{name}_{version}");
-                Directory.CreateDirectory(windowsMcClientPath);
-                Directory.CreateDirectory(linuxMcClientPath);
-                Directory.CreateDirectory(macMcClientPath);
-
-
-                File.Copy(neoforgeInstaller, destinationPath, true);
-            }
-            else if (modloader.Equals("vanilla", StringComparison.OrdinalIgnoreCase))
-            {
-                var vanillaServerRunner = await MinecraftDownloader.DownloadVanillaMinecraftServer(version, GetFolderPath(name));
-                Console.WriteLine($"Vanilla server jar downloaded to {vanillaServerRunner}");
+                foreach (var filePath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
+                {
+                    File.Copy(filePath, filePath.Replace(sourcePath, destinationPath), true);
+                }
             }
             else
             {
-                throw new ManagerException($"Modloader {modloader} is not supported.");
+                throw new ManagerException($"Asset path {sourcePath} does not exist.");
             }
-
-            Console.WriteLine($"Config {name} created.");
         }
 
+        /// <summary>
+        /// The RemoveAsset
+        /// </summary>
+        /// <param name="assetPath">The assetPath<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        private static void RemoveAsset(string assetPath, string assetName)
+        {
+            // Rechercher les fichiers correspondant au préfixe assetName
+            var matchingFiles = Directory.GetFiles(assetPath, $"{assetName}_*");
+            var matchingDirectories = Directory.GetDirectories(assetPath, $"{assetName}_*");
+
+            // Supprimer les fichiers correspondants
+            if (matchingFiles.Any())
+            {
+                foreach (var file in matchingFiles)
+                {
+                    File.Delete(file);
+                }
+            }
+
+            // Supprimer les dossiers correspondants
+            if (matchingDirectories.Any())
+            {
+                foreach (var directory in matchingDirectories)
+                {
+                    Directory.Delete(directory, true);
+                }
+            }
+
+            // Si aucun fichier ou dossier correspondant n'est trouvé, lever une exception
+            if (!matchingFiles.Any() && !matchingDirectories.Any())
+            {
+                Console.Write($"Warning: Asset {assetName} not found in {assetPath}.");
+            }
+        }
+
+        // Add Asset to baseServer directory (no .minecraft)
+
+        /// <summary>
+        /// The AddAssetToBaseServer
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="assetPath">The assetPath<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        public void AddAssetToBaseServer(string name, string assetPath, string assetType)
+        {
+            var baseServerPath = GetBaseServerPath(name);
+            if (!Directory.Exists(baseServerPath))
+                throw new ManagerException($"Base server path for {name} does not exist. Ensure the server is prepared.");
+            var baseServerAssetPath = GetOrCreateBaseServerAssetPath(name, assetType);
+            // TODO: Tester avec tous les types d'assets, puis s'attaquer aux serveurs pour récup baseServer
+            CopyAsset(assetPath, baseServerAssetPath);
+        }
+
+        // Remove Asset from baseServer directory (no .minecraft)
+
+        /// <summary>
+        /// The RemoveAssetFromBaseServer
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        public void RemoveAssetFromBaseServer(string name, string assetType, string assetName)
+        {
+            var baseServerPath = GetBaseServerPath(name);
+            if (!Directory.Exists(baseServerPath))
+                throw new ManagerException($"Base server path for {name} does not exist. Ensure the server is prepared.");
+            var baseServerAssetPath = GetBaseServerAssetPath(name, assetType);
+
+            RemoveAsset(baseServerAssetPath, assetName);
+        }
+
+        /// <summary>
+        /// The ReplaceMinecraftVersion
+        /// </summary>
+        /// <param name="filePath">The filePath<see cref="string"/></param>
+        /// <param name="version">The version<see cref="string"/></param>
+        private static void ReplaceMinecraftVersion(string filePath, string version)
+        {
+            var content = File.ReadAllText(filePath);
+            content = content.Replace("{minecraftVersion}", version);
+            File.WriteAllText(filePath, content);
+        }
+
+        /// <summary>
+        /// The ReplaceInstanceName
+        /// </summary>
+        /// <param name="filePath">The filePath<see cref="string"/></param>
+        /// <param name="instanceName">The instanceName<see cref="string"/></param>
+        private static void ReplaceInstanceName(string filePath, string instanceName)
+        {
+            var content = File.ReadAllText(filePath);
+            content = content.Replace("{instanceName}", instanceName);
+            File.WriteAllText(filePath, content);
+        }
+
+        /// <summary>
+        /// The ReplaceModLoaderVersion
+        /// </summary>
+        /// <param name="filePath">The filePath<see cref="string"/></param>
+        /// <param name="modloader">The modloader<see cref="string"/></param>
+        /// <param name="modLoaderVersion">The modLoaderVersion<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string ReplaceModLoaderVersion(string filePath, string modloader, string modLoaderVersion)
+        {
+            var content = File.ReadAllText(filePath);
+            content = content.Replace($"{{{modloader}Version}}", modLoaderVersion);
+            File.WriteAllText(filePath, content);
+            return filePath;
+        }
+
+        /// <summary>
+        /// The Read
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <returns>The <see cref="ConfigJsonDb"/></returns>
         public ConfigJsonDb Read(string configName)
         {
             if (!ConfigExists(configName))
@@ -119,29 +456,54 @@ namespace Minecraft_Easy_Servers.Managers
             return JsonSerializer.Deserialize<ConfigJsonDb>(File.ReadAllText(GetConfigPath(configName))) ?? throw new ManagerException($"An error occured while deserializing config {configName}");
         }
 
-        public void AddAsset(string name, string assetName, string link, string filePath, string collectionName)
+        /// <summary>
+        /// The AddAsset
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <param name="assetLink">The assetLink<see cref="string"/></param>
+        /// <param name="filePath">The filePath<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        public void AddAsset(string configName, string assetName, string assetLink, string filePath, string assetType)
         {
-            var isDownloaded = link.Contains("http") || link.Contains("https");
-            if (!ConfigExists(name))
-                throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
-            var store = new DataStore(GetConfigPath(name));
-            var collection = store.GetCollection<Asset>(collectionName);
+            var isDownloaded = assetLink.Contains("http") || assetLink.Contains("https");
+            if (!ConfigExists(configName))
+                throw new ManagerException($"Config with name {configName} doesn't exists. To create it, run: $ add-config {configName}");
+            var store = new DataStore(GetConfigPath(configName));
+            var collection = store.GetCollection<Asset>(assetType);
             var existingAsset = collection.Find(x => x.Name.Equals(assetName)).FirstOrDefault();
             if (existingAsset != null)
-                throw new ManagerException($"{collectionName} with name {assetName} already exists. To remove it, run: $ remove-{collectionName.ToLower()} {name} {assetName}");
+                throw new ManagerException($"{assetType} with name {assetName} already exists. To remove it, run: $ remove-{assetType.ToLower()} {configName} {assetName}");
+
+            // Add asset to base server
+            AddAssetToBaseServer(configName, filePath, assetType);
+
+            // Add asset to clients
+            AddAssetToClient(configName, Read(configName).Version, assetType, assetName, filePath);
 
             var asset = new Asset()
             {
-                Link = isDownloaded ? link : "file:"+filePath,
+                Link = isDownloaded ? assetLink : "file:" + filePath,
                 Name = assetName
             };
 
             collection.InsertOne(asset);
-            Console.WriteLine($"{collectionName} {assetName} added to config {name}.");
+            Console.WriteLine($"{assetType} {assetName} added to config {configName}.");
         }
 
+        /// <summary>
+        /// The AddMod
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="modName">The modName<see cref="string"/></param>
+        /// <param name="link">The link<see cref="string"/></param>
+        /// <param name="modType">The modType<see cref="ModTypeEnum"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         public async Task AddMod(string name, string modName, string link, ModTypeEnum modType)
         {
+            if (!ConfigExists(name))
+                throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
+
             var filePath = await DownloadOrCopyAssetAsync(configName: name, assetType: "mods", assetName: modName, assetLink: link, searchForFileWithExtension: ".jar");
 
             if (string.IsNullOrEmpty(filePath))
@@ -177,8 +539,17 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Mod {modName} added to {modType.ToString().ToLower()} configuration for {name}.");
         }
 
+        /// <summary>
+        /// The AddPlugin
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="pluginName">The pluginName<see cref="string"/></param>
+        /// <param name="link">The link<see cref="string"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         public async Task AddPlugin(string name, string pluginName, string link)
         {
+            if (!ConfigExists(name))
+                throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "plugins",
@@ -191,8 +562,18 @@ namespace Minecraft_Easy_Servers.Managers
             AddAsset(name, pluginName, link, filePath, "plugins");
         }
 
+        /// <summary>
+        /// The AddResourcePack
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="resourcePackName">The resourcePackName<see cref="string"/></param>
+        /// <param name="link">The link<see cref="string"/></param>
+        /// <param name="isServerDefault">The isServerDefault<see cref="bool"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         public async Task AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
+            if (!ConfigExists(name))
+                throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "resourcePacks",
@@ -224,8 +605,18 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
+        /// <summary>
+        /// The AddWorld
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="worldName">The worldName<see cref="string"/></param>
+        /// <param name="link">The link<see cref="string"/></param>
+        /// <param name="isServerDefault">The isServerDefault<see cref="bool"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         public async Task AddWorld(string name, string worldName, string link, bool isServerDefault = false)
         {
+            if (!ConfigExists(name))
+                throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(
                 configName: name,
                 assetType: "worlds",
@@ -258,11 +649,20 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
+        /// <summary>
+        /// The GetConfigPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetConfigPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "config.json");
         }
 
+        /// <summary>
+        /// The RemoveConfig
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
         public void RemoveConfig(string name)
         {
             if (!ConfigExists(name))
@@ -271,28 +671,45 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Config {name} removed.");
         }
 
+        /// <summary>
+        /// The ConfigExists
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="bool"/></returns>
         private static bool ConfigExists(string name)
         {
             return Directory.Exists(GetFolderPath(name));
         }
 
+        /// <summary>
+        /// The GetFolderPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetFolderPath(string name)
         {
             return Path.Combine(FolderName, name);
         }
-        public void RemoveAsset(string name, string assetName, string collectionName)
+
+        /// <summary>
+        /// The RemoveAsset
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        public void RemoveAsset(string name, string assetName, string assetType)
         {
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exist. To create it, run: $ add-config {name}");
 
             var store = new DataStore(GetConfigPath(name));
-            var collection = store.GetCollection<Asset>(collectionName);
+            var collection = store.GetCollection<Asset>(assetType);
             var existingAsset = collection.Find(x => x.Name.Equals(assetName)).FirstOrDefault();
 
             if (existingAsset == null)
-                throw new ManagerException($"{collectionName} with name {assetName} doesn't exist. To add it, run: $ add-{collectionName.ToLower()} {name} {assetName}");
+                throw new ManagerException($"{assetType} with name {assetName} doesn't exist. To add it, run: $ add-{assetType.ToLower()} {name} {assetName}");
 
-            var assetPath = GetOrCreateAssetFolderPath(name, collectionName);
+            var assetPath = GetOrCreateAssetFolderPath(name, assetType);
             // Remove asset file or asset directory to assetPath/assetName
             var assetFilePath = Path.Combine(assetPath, assetName);
             var matchingFiles = Directory.GetFiles(assetPath, $"{assetName}_*");
@@ -316,10 +733,18 @@ namespace Minecraft_Easy_Servers.Managers
                 Console.WriteLine($"Warning: Asset {assetName} not found in {assetPath}.");
             }
 
+            RemoveAssetFromBaseServer(name, assetType, assetName);
+            RemoveAssetFromClient(name, Read(name).Version, assetType, assetName);
+
             collection.DeleteOne(x => x.Name.Equals(assetName));
-            Console.WriteLine($"{collectionName} {assetName} removed from config {name}.");
+            Console.WriteLine($"{assetType} {assetName} removed from config {name}.");
         }
 
+        /// <summary>
+        /// The RemoveMod
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="modName">The modName<see cref="string"/></param>
         public void RemoveMod(string name, string modName)
         {
             RemoveAsset(name, modName, "mods");
@@ -346,11 +771,21 @@ namespace Minecraft_Easy_Servers.Managers
             Console.WriteLine($"Mod {modName} removed from all configurations for {name}.");
         }
 
+        /// <summary>
+        /// The RemovePlugin
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="pluginName">The pluginName<see cref="string"/></param>
         public void RemovePlugin(string name, string pluginName)
         {
             RemoveAsset(name, pluginName, "plugins");
         }
 
+        /// <summary>
+        /// The RemoveResourcePack
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="resourcePackName">The resourcePackName<see cref="string"/></param>
         public void RemoveResourcePack(string name, string resourcePackName)
         {
             if (!ConfigExists(name))
@@ -380,6 +815,13 @@ namespace Minecraft_Easy_Servers.Managers
         }
 
         // List asset by asset type. Give Asset objects correspond to the collection
+
+        /// <summary>
+        /// The ListAssets
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <returns>The <see cref="List{Asset}"/></returns>
         public List<Asset> ListAssets(string configName, string assetName)
         {
             if (!ConfigExists(configName))
@@ -390,6 +832,15 @@ namespace Minecraft_Easy_Servers.Managers
         }
 
         // Download mods
+
+        /// <summary>
+        /// The DownloadAssetsAsync
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <param name="searchForFileWithExtension">The searchForFileWithExtension<see cref="string?"/></param>
+        /// <param name="extractOnly">The extractOnly<see cref="bool"/></param>
+        /// <returns>The <see cref="Task"/></returns>
         private async Task DownloadAssetsAsync(string configName, string assetName, string? searchForFileWithExtension = null, bool extractOnly = false)
         {
             var assets = ListAssets(configName, assetName)
@@ -400,6 +851,16 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
+        /// <summary>
+        /// The DownloadOrCopyAssetAsync
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <param name="assetLink">The assetLink<see cref="string"/></param>
+        /// <param name="searchForFileWithExtension">The searchForFileWithExtension<see cref="string?"/></param>
+        /// <param name="contentIsFolder">The contentIsFolder<see cref="bool"/></param>
+        /// <returns>The <see cref="Task{string?}"/></returns>
         private static async Task<string?> DownloadOrCopyAssetAsync(string configName, string assetType, string assetName, string assetLink, string? searchForFileWithExtension, bool contentIsFolder = false)
         {
             var assetFolderPath = GetOrCreateAssetFolderPath(configName, assetType);
@@ -440,15 +901,11 @@ namespace Minecraft_Easy_Servers.Managers
             return null;
         }
 
-        private static string GetOrCreateAssetFolderPath(string configName, string assetName)
-        {
-            var assetFolderPath = Path.Combine(GetFolderPath(configName), assetName);
-            if (!Directory.Exists(assetFolderPath))
-                Directory.CreateDirectory(assetFolderPath);
-
-            return assetFolderPath;
-        }
-
+        /// <summary>
+        /// The RemoveWorld
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="worldName">The worldName<see cref="string"/></param>
         public void RemoveWorld(string name, string worldName)
         {
             if (!ConfigExists(name))
@@ -473,10 +930,15 @@ namespace Minecraft_Easy_Servers.Managers
                 store.ReplaceItem("client", clientConfig);
             }
 
-
             RemoveAsset(name, worldName, "worlds");
         }
-        private static string GetOrCreateBaseManualClientPath(string name)
+
+        /// <summary>
+        /// The GetOrCreateBaseDIYClientPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string GetOrCreateBaseDIYClientPath(string name)
         {
             var path = GetBaseManualClientPath(name);
             if (!Directory.Exists(path))
@@ -484,6 +946,45 @@ namespace Minecraft_Easy_Servers.Managers
             return path;
         }
 
+        /// <summary>
+        /// The GetOrCreateAssetFolderPath
+        /// </summary>
+        /// <param name="configName">The configName<see cref="string"/></param>
+        /// <param name="assetName">The assetName<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string GetOrCreateAssetFolderPath(string configName, string assetName)
+        {
+            var assetFolderPath = Path.Combine(GetFolderPath(configName), assetName);
+            if (!Directory.Exists(assetFolderPath))
+                Directory.CreateDirectory(assetFolderPath);
+
+            return assetFolderPath;
+        }
+
+        /// <summary>
+        /// The GetOrCreateBaseServerAssetPath
+        /// </summary>
+        /// <param name="assetType">The assetType<see cref="string"/></param>
+        /// <param name="baseServerPath">The baseServerPath<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
+        private static string GetOrCreateBaseServerAssetPath(string configName, string assetType)
+        {
+            var serverAssetPath = GetBaseServerAssetPath(configName, assetType);
+            if (!Directory.Exists(serverAssetPath))
+                Directory.CreateDirectory(serverAssetPath);
+            return serverAssetPath;
+        }
+
+        private static string GetBaseServerAssetPath(string configName, string assetType)
+        {
+            return Path.Combine(GetBaseServerPath(configName), assetType);
+        }
+
+        /// <summary>
+        /// The GetOrCreateBaseMultiMCClientPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetOrCreateBaseMultiMCClientPath(string name)
         {
             var path = GetBaseMultiMCClientPath(name);
@@ -492,6 +993,11 @@ namespace Minecraft_Easy_Servers.Managers
             return path;
         }
 
+        /// <summary>
+        /// The GetOrCreateBaseServerPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetOrCreateBaseServerPath(string name)
         {
             var path = GetBaseServerPath(name);
@@ -500,16 +1006,31 @@ namespace Minecraft_Easy_Servers.Managers
             return path;
         }
 
+        /// <summary>
+        /// The GetBaseManualClientPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetBaseManualClientPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseManualClient");
         }
 
+        /// <summary>
+        /// The GetBaseMultiMCClientPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetBaseMultiMCClientPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseMultiMCClient");
         }
 
+        /// <summary>
+        /// The GetBaseServerPath
+        /// </summary>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <returns>The <see cref="string"/></returns>
         private static string GetBaseServerPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseServer");

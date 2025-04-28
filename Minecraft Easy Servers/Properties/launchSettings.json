@@ -18,11 +18,23 @@
     },
     "Add mod configtest": {
       "commandName": "Project",
-      "commandLineArgs": "add-mod configtest the-beast https://mediafilez.forgecdn.net/files/5294/86/The-Beast-1.19.2.jar"
+      "commandLineArgs": "add-mod configtest the-beast C:\\Users\\user\\Downloads\\The-Beast-1.19.2.zip"
+    },
+    "Add config configtest": {
+      "commandName": "Project",
+      "commandLineArgs": "add-config configtest forge 1.21.4"
+    },
+    "Remove config configtest": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-config configtest"
     },
     "Add mod configtest archive": {
       "commandName": "Project",
       "commandLineArgs": "add-mod configtest the-beast C:\\Users\\user\\Downloads\\The-Beast-1.19.2.zip"
+    },
+    "Remove mod configtest archive": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-mod configtest the-beast"
     }
   }
 }

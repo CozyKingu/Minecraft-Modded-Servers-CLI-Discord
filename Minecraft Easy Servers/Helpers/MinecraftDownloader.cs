@@ -123,7 +123,7 @@ namespace Minecraft_Easy_Servers.Helpers
             string manifestJson = await client.GetStringAsync(manifestUrl);
             using JsonDocument manifestDoc = JsonDocument.Parse(manifestJson);
             var versionValue = manifestDoc.RootElement
-                .GetProperty("promotions")
+                .GetProperty("promos")
                 .EnumerateObject()
                 .Where(v => v.Name.StartsWith(minecraftVersion))
                 .OrderByDescending(v => v.Name.Contains("recommended") ? 1 : 0) // Prioritize "recommended"
@@ -133,7 +133,7 @@ namespace Minecraft_Easy_Servers.Helpers
 
             if (string.IsNullOrEmpty(versionValue))
                 throw new ManagerException($"Version {minecraftVersion} cannot be found for forge. Use neoforge for compatibility with newer versions of Minecraft.");
-            var urlDownload = GlobalConfigHelper.ReadStringProperty("forgeDownloadJar")?.Replace("{forgeVersion}", versionValue) ?? throw new Exception($"Cannot find property forgeDownloadJar");
+            var urlDownload = GlobalConfigHelper.ReadStringProperty("forgeDownloadJar")?.Replace("{forgeVersion}", versionValue)?.Replace("{mineVersion}", minecraftVersion) ?? throw new Exception($"Cannot find property forgeDownloadJar");
             var outputPath = Path.Combine(folderPath, urlDownload.Split('/').Last());
             using var serverStream = await client.GetStreamAsync(urlDownload);
             using var fileStream = File.Create(outputPath);
@@ -144,13 +144,13 @@ namespace Minecraft_Easy_Servers.Helpers
         private static string GetMinecraftVersionForNeoforge(string? neoforgeVersion)
         {
             // 1.{mineMinor}.{minePatch}
-            var neoforgeVersionMatchingRule = GlobalConfigHelper.ReadStringProperty("neoforgeVersionMatchingRule") ?? throw new Exception("Cannot find property neoforgeVersionMatchingRule");
+                var neoforgeVersionMatchingRule = GlobalConfigHelper.ReadStringProperty("neoforgeVersionMatchingRule") ?? throw new Exception("Cannot find property neoforgeVersionMatchingRule");
             var splittedVersion = neoforgeVersion?.Split('.');
 
             //TODO: Add more flexibility for version matching.
             return neoforgeVersionMatchingRule
                 .Replace("{mineMinor}", splittedVersion?[0] ?? string.Empty)
-                .Replace("{minePath}", splittedVersion?[1] ?? string.Empty);
+                .Replace("{minePatch}", splittedVersion?[1] ?? string.Empty);
         }
 
         public static async Task<string> DownloadFile(string targetDirectoryPath, string link, string? prefixName = null)
