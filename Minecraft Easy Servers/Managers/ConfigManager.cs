@@ -58,7 +58,7 @@
             {
                 throw new ManagerException($"EULA file not found in {baseServerPath}. Please check the installation.");
             }
-            File.Copy(eulaPath, Path.Combine(GetFolderPath(name), "eula.txt"), true);
+            File.Copy(eulaPath, Path.Combine(baseServerPath, "eula.txt"), true);
 
             // Create baseClient directory
             var baseDIYClientPath = GetOrCreateBaseDIYClientPath(name);
@@ -92,7 +92,7 @@
                     var forgeVersion = Path.GetFileName(forgeInstaller).Split('-')[2];
 
                     Console.WriteLine($"Forge installer downloaded to {forgeInstaller}. Installing base server.");
-                    var ack = executeManager.ExecuteJarAndStop(forgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(forgeInstaller)} --installServer {baseServerPath}");
+                    var ack = executeManager.ExecuteJarAndStop(forgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(forgeInstaller)} --installServer baseServer");
                     if (!ack)
                     {
                         Directory.Delete(GetFolderPath(name), true);
@@ -118,7 +118,7 @@
                     var neoforgeVersion = Path.GetFileName(neoforgeInstaller).Split('-')[1];
 
                     Console.WriteLine($"Neoforge installer downloaded to {neoforgeInstaller}. Installing base server.");
-                    var ack = executeManager.ExecuteJarAndStop(neoforgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(neoforgeInstaller)} --server-jar --install-server {baseServerPath}");
+                    var ack = executeManager.ExecuteJarAndStop(neoforgeInstaller, "The server installed successfully", $"-jar {Path.GetFileName(neoforgeInstaller)} --install-server baseServer");
                     if (!ack)
                     {
                         Directory.Delete(GetFolderPath(name), true);
@@ -228,7 +228,7 @@
             {
                 // Handle MultiMC client
                 string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
-                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType);
+                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetType.ToLower());
                 if (!Directory.Exists(multiMCInstanceAssetPath))
                     throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
 
@@ -264,7 +264,7 @@
         /// <returns>The <see cref="string"/></returns>
         private static string GetDIYClientAssetPath(string name, string assetType)
         {
-            return Path.Combine(GetBaseManualClientPath(name), assetType);
+            return Path.Combine(GetBaseManualClientPath(name), assetType.ToLower());
         }
 
         /// <summary>
@@ -314,16 +314,17 @@
             {
                 if (Directory.Exists(destinationPath))
                     Directory.Delete(destinationPath, true);
-                Directory.CreateDirectory(destinationPath);
+                var copiedFolderPath = Path.Combine(destinationPath, Path.GetFileName(sourcePath));
+                Directory.CreateDirectory(Path.Combine(destinationPath, Path.GetFileName(sourcePath)));
 
                 foreach (var dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
                 {
-                    Directory.CreateDirectory(dirPath.Replace(sourcePath, destinationPath));
+                    Directory.CreateDirectory(dirPath.Replace(sourcePath, copiedFolderPath));
                 }
 
                 foreach (var filePath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
                 {
-                    File.Copy(filePath, filePath.Replace(sourcePath, destinationPath), true);
+                    File.Copy(filePath, filePath.Replace(sourcePath, copiedFolderPath), true);
                 }
             }
             else
@@ -464,7 +465,9 @@
         /// <param name="assetLink">The assetLink<see cref="string"/></param>
         /// <param name="filePath">The filePath<see cref="string"/></param>
         /// <param name="assetType">The assetType<see cref="string"/></param>
-        public void AddAsset(string configName, string assetName, string assetLink, string filePath, string assetType)
+        /// <param name="addToClient"></param>
+        /// <param name="addToServer"></param>
+        public void AddAsset(string configName, string assetName, string assetLink, string filePath, string assetType, bool addToClient, bool addToServer)
         {
             var isDownloaded = assetLink.Contains("http") || assetLink.Contains("https");
             if (!ConfigExists(configName))
@@ -509,12 +512,16 @@
             if (string.IsNullOrEmpty(filePath))
                 throw new ManagerException($"Retrieving mod from {link} failed");
 
-            AddAsset(name, modName, link, filePath, "mods");
+            bool isModForServer = modType == ModTypeEnum.SERVER || modType == ModTypeEnum.GLOBAL;
+            bool isModForClient = modType == ModTypeEnum.CLIENT || modType == ModTypeEnum.GLOBAL;
+
+
+            AddAsset(name, modName, link, filePath, "mods", isModForClient, isModForServer);
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
             // Sync server and client config.
-            if (modType == ModTypeEnum.SERVER || modType == ModTypeEnum.GLOBAL)
+            if (isModForServer)
             {
                 var serverConfig = store.GetItem<ServerConfig>("server") ?? new ServerConfig();
                 serverConfig.Mods ??= new List<string>();
@@ -525,7 +532,7 @@
                 }
             }
 
-            if (modType == ModTypeEnum.CLIENT || modType == ModTypeEnum.GLOBAL)
+            if (isModForClient)
             {
                 var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
                 clientConfig.Mods ??= new List<string>();
@@ -559,7 +566,7 @@
                 contentIsFolder: false);
             if (string.IsNullOrEmpty(filePath))
                 throw new ManagerException($"Retrieving plugin from {link} failed");
-            AddAsset(name, pluginName, link, filePath, "plugins");
+            AddAsset(name, pluginName, link, filePath, "plugins", addToClient: false, addToServer: true);
         }
 
         /// <summary>
@@ -584,13 +591,19 @@
             if (string.IsNullOrEmpty(filePath))
                 throw new ManagerException($"Retrieving resource pack from {link} failed");
 
-            AddAsset(name, resourcePackName, link, filePath, "resourcePacks");
+            if (isServerDefault)
+            {
+                // Removing default resource pack from server config.
+                RemoveAssetFromBaseServer(name, "resourcePacks", Read(name).Server.ResourcePack);
+            }
+
+            AddAsset(name, resourcePackName, link, filePath, "resourcePacks", !isServerDefault, isServerDefault);
 
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
             var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
             clientConfig.ResourcePacks ??= new List<string>();
-            if (!clientConfig.ResourcePacks.Contains(resourcePackName))
+            if (!clientConfig.ResourcePacks.Contains(resourcePackName) && !isServerDefault)
             {
                 clientConfig.ResourcePacks.Add(resourcePackName);
                 store.ReplaceItem("client", clientConfig);
@@ -627,7 +640,13 @@
             if (string.IsNullOrEmpty(filePath))
                 throw new ManagerException($"Retrieving world from {link} failed");
 
-            AddAsset(name, worldName, link, filePath, "worlds");
+            if (isServerDefault)
+            {
+                // Removing default resource pack from server config.
+                RemoveAssetFromBaseServer(name, "worlds", Read(name).Server.DefaultWorld);
+            }
+
+            AddAsset(name, worldName, link, filePath, "worlds", !isServerDefault, isServerDefault);
             var configPath = GetConfigPath(name);
             var store = new DataStore(configPath);
 
@@ -639,13 +658,15 @@
                 store.ReplaceItem("server", config);
                 Console.WriteLine($"World {worldName} set as default for config {name}.");
             }
-
-            var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
-            clientConfig.Worlds ??= new List<string>();
-            if (!clientConfig.Worlds.Contains(worldName))
+            else
             {
-                clientConfig.Worlds.Add(worldName);
-                store.ReplaceItem("client", clientConfig);
+                var clientConfig = store.GetItem<ClientConfig>("client") ?? new ClientConfig();
+                clientConfig.Worlds ??= new List<string>();
+                if (!clientConfig.Worlds.Contains(worldName))
+                {
+                    clientConfig.Worlds.Add(worldName);
+                    store.ReplaceItem("client", clientConfig);
+                }
             }
         }
 
@@ -876,7 +897,7 @@
                 if (searchForFileWithExtension != null && assetLink.Contains(searchForFileWithExtension))
                 {
                     // Copy file and finish.
-                    string destPath = Path.Combine(assetFolderPath, Path.GetFileName(assetLink));
+                    string destPath = Path.Combine(assetFolderPath, $"{assetName}_{Path.GetFileName(assetLink)}");
                     File.Copy(assetLink, destPath, true);
                     return destPath;
                 }
@@ -954,7 +975,7 @@
         /// <returns>The <see cref="string"/></returns>
         private static string GetOrCreateAssetFolderPath(string configName, string assetName)
         {
-            var assetFolderPath = Path.Combine(GetFolderPath(configName), assetName);
+            var assetFolderPath = Path.Combine(GetFolderPath(configName), "allAssets", assetName.ToLower());
             if (!Directory.Exists(assetFolderPath))
                 Directory.CreateDirectory(assetFolderPath);
 
@@ -977,7 +998,7 @@
 
         private static string GetBaseServerAssetPath(string configName, string assetType)
         {
-            return Path.Combine(GetBaseServerPath(configName), assetType);
+            return Path.Combine(GetBaseServerPath(configName), assetType.ToLower());
         }
 
         /// <summary>
