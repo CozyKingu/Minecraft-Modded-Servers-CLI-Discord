@@ -81,7 +81,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 - serverSide (optional): Boolean for server-side mod.
 
 **Example:**  
-`/add-mod myConfig myMod http://mod-link.com true false`
+`/add-mod myConfig myMod http://mod-link.jar true false`
 
 ---
 
@@ -114,7 +114,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 - link: The URL to the plugin.
 
 **Example:**  
-`/add-plugin myConfig myPlugin http://plugin-link.com`
+`/add-plugin myConfig myPlugin http://plugin-link.jar`
 
 ---
 
@@ -127,7 +127,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 - serverDefault (optional): Boolean for default server resource pack.
 
 **Example:**  
-`/add-resource-pack myConfig myPack http://pack-link.com true`
+`/add-resource-pack myConfig myPack http://pack-link.zip true`
 
 ---
 
@@ -150,7 +150,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 - link: The URL to the mod.
 
 **Example:**  
-`/add-server-mod myServer myMod http://mod-link.com`
+`/add-server-mod myServer myMod http://mod-link.jar`
 
 ---
 
@@ -162,7 +162,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 - link: The URL to the plugin.
 
 **Example:**  
-`/add-server-plugin myServer myPlugin http://plugin-link.com`
+`/add-server-plugin myServer myPlugin http://plugin-link.jar`
 
 ---
 
