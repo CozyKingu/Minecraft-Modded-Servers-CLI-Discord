@@ -1,6 +1,7 @@
 ﻿namespace Minecraft_Easy_Servers.Managers
 {
     using JsonFlatFileDataStore;
+    using Microsoft.Extensions.Options;
     using Minecraft_Easy_Servers.Exceptions;
     using Minecraft_Easy_Servers.Helpers;
     using Minecraft_Easy_Servers.Managers.Models;
@@ -594,6 +595,12 @@
         /// <returns>The <see cref="Task"/></returns>
         public async Task AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
+            if (isServerDefault && !(link.Contains("https") || link.Contains("http")))
+            {
+                Console.WriteLine("Server default resource pack must be an http / https link in order to be downloadable. Remove --server-default to put the resource pack in the client.");
+                return;
+            }
+
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(

@@ -1,5 +1,4 @@
-﻿using Kajabity.Tools.Java;
-using Microsoft.Extensions.Primitives;
+﻿using Microsoft.Extensions.Primitives;
 using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
 
@@ -12,6 +11,7 @@ namespace Minecraft_Easy_Servers.Managers
         private readonly ConfigManager configManager;
         public const string FolderName = "servers";
         private const string AssetsFolder = "Assets";
+        private const int RCON_PORT_OFFSET = 100;
 
         public ServerManager(ExecuteManager executeManager, CommandManager commandManager, ConfigManager configManager)
         {
@@ -74,15 +74,11 @@ namespace Minecraft_Easy_Servers.Managers
                     UpdateServerPropertiesValue(name, "level-name", Path.GetFileName(worldDirectoryPath)!);
                 }
 
-                // TODO: Give a check to resource pack because not sent to client.
                 string defaultResourcePack = configManager.Read(configName).Server.ResourcePack;
-                if (!string.IsNullOrEmpty(defaultResourcePack))
+                if (!string.IsNullOrEmpty(defaultResourcePack) && (defaultResourcePack.Contains("http") || defaultResourcePack.Contains("https")))
                 {
-                    Console.WriteLine($"Default resource pack found in config {defaultResourcePack}.");
-                    var resourcePackDirectoryPath = Directory.EnumerateFiles(Path.Combine(GetFolderPath(name), "resourcepacks"), $"{defaultResourcePack}_*").FirstOrDefault();
-                    if (resourcePackDirectoryPath is null)
-                        throw new ManagerException($"The resource pack {defaultResourcePack} is not found in {name} server folder");
-                    UpdateServerPropertiesValue(name, "resource-pack", resourcePackDirectoryPath!);
+                    Console.WriteLine($"Default resource pack found link in config {defaultResourcePack}.");
+                    UpdateServerPropertiesValue(name, "resource-pack", defaultResourcePack!);
                 }
 
                 if (modloader == "vanilla")
@@ -143,7 +139,7 @@ namespace Minecraft_Easy_Servers.Managers
             UpdateServerPropertiesValue(name, "motd", name);
             UpdateServerPropertiesValue(name, "server-port", port.ToString());
             UpdateServerPropertiesValue(name, "query.port", port.ToString());
-            UpdateServerPropertiesValue(name, "rcon.port", (port + 10).ToString());
+            UpdateServerPropertiesValue(name, "rcon.port", (port + RCON_PORT_OFFSET).ToString());
             UpdateServerPropertiesValue(name, "enable-rcon", "true");
             UpdateServerPropertiesValue(name, "rcon.password", "password");
 
@@ -299,6 +295,7 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
+        // Debug purpose only.
         private async Task<bool> FirstRunServerSoft(string name)
         {
             try
@@ -340,36 +337,65 @@ namespace Minecraft_Easy_Servers.Managers
             return int.Parse(GetServerPropertiesValue(name, "rcon.port"));
         }
 
+        //  Get server.properties value for key=value
         public string GetServerPropertiesValue(string name, string propertyKey)
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
-            string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
-            var properties = new JavaProperties();
 
-            using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
+            string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
+
+            var properties = new Dictionary<string, string>();
+            foreach (var line in File.ReadLines(serverPropertiesFilePath))
             {
-                properties.Load(streamIn);
+                if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
+                {
+                    var keyValue = line.Split('=', 2);
+                    if (keyValue.Length == 2)
+                        properties[keyValue[0].Trim()] = keyValue[1].Trim();
+                }
             }
 
-            return properties.GetValueOrDefault(propertyKey) ?? throw new ManagerException($"Property {propertyKey} is missing in {name} server server.properties");
+            if (!properties.TryGetValue(propertyKey, out var value))
+                throw new ManagerException($"Property {propertyKey} not found in server.properties for server {name}.");
+
+            return value;
         }
 
         public bool UpdateServerPropertiesValue(string name, string propertyKey, string newValue)
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+
             string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
-            var properties = new JavaProperties();
-            using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
+
+            var lines = File.ReadAllLines(serverPropertiesFilePath);
+            bool propertyUpdated = false;
+
+            for (int i = 0; i < lines.Length; i++)
             {
-                properties.Load(streamIn);
+                if (!string.IsNullOrWhiteSpace(lines[i]) && !lines[i].StartsWith("#"))
+                {
+                    var keyValue = lines[i].Split('=', 2);
+                    if (keyValue.Length == 2 && keyValue[0].Trim() == propertyKey)
+                    {
+                        lines[i] = $"{propertyKey}={newValue}";
+                        propertyUpdated = true;
+                        break;
+                    }
+                }
             }
 
-            properties.SetProperty(propertyKey, newValue);
-            using (FileStream streamOut = new(serverPropertiesFilePath, FileMode.Open))
+            if (!propertyUpdated)
             {
-                properties.Store(streamOut);
+                using (var writer = File.AppendText(serverPropertiesFilePath))
+                {
+                    writer.WriteLine($"{propertyKey}={newValue}");
+                }
+            }
+            else
+            {
+                File.WriteAllLines(serverPropertiesFilePath, lines);
             }
 
             return true;
