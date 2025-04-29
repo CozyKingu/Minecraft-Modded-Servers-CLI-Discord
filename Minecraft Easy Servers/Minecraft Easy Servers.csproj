@@ -10,10 +10,30 @@
 
   <ItemGroup>
     <None Remove="Assets\eula.txt" />
+    <None Remove="Assets\MultiMC\instance.cfg" />
+    <None Remove="Assets\server.properties" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="Assets\eula.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\MultiMC\instance.cfg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\MultiMC\mmc-pack-vanilla.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\MultiMC\mmc-pack-forge.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\MultiMC\mmc-pack-neoforge.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\server.properties">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="minecraft-easy-servers-config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

@@ -4,13 +4,21 @@
       "commandName": "Project",
       "commandLineArgs": " add-server server2 -v 1.21.3"
     },
-    "Down server 1": {
+    "Down server 2": {
       "commandName": "Project",
-      "commandLineArgs": "down server1"
+      "commandLineArgs": "down server2"
     },
-    "Up server 1": {
+    "Up server 2": {
       "commandName": "Project",
-      "commandLineArgs": "up server1 25566"
+      "commandLineArgs": "up server2 25566"
+    },
+    "Create server 2": {
+      "commandName": "Project",
+      "commandLineArgs": "add-server server2 -c configtest"
+    },
+    "Remove server 2": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-server server2"
     },
     "Status server 1": {
       "commandName": "Project",
@@ -18,11 +26,23 @@
     },
     "Add mod configtest": {
       "commandName": "Project",
-      "commandLineArgs": "add-mod configtest the-beast https://mediafilez.forgecdn.net/files/5294/86/The-Beast-1.19.2.jar"
+      "commandLineArgs": "add-mod configtest the-beast C:\\Users\\user\\Downloads\\The-Beast-1.19.2.zip"
+    },
+    "Add config configtest": {
+      "commandName": "Project",
+      "commandLineArgs": "add-config configtest forge 1.21.4"
+    },
+    "Remove config configtest": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-config configtest"
     },
     "Add mod configtest archive": {
       "commandName": "Project",
       "commandLineArgs": "add-mod configtest the-beast C:\\Users\\user\\Downloads\\The-Beast-1.19.2.zip"
+    },
+    "Remove mod configtest archive": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-mod configtest the-beast"
     }
   }
 }
