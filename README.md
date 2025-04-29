@@ -201,7 +201,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 
 ## Notes
 
-- **Standalone Clients:** Based on MultiMC for easy Minecraft modded client distribution.  
+- **Standalone Clients:** Based on [MultiMC](https://github.com/MultiMC) for easy Minecraft modded client distribution.  
 - **Development Status:** Documentation and releases are being prepared. Stay tuned for updates!
 
 ---
