@@ -29,7 +29,7 @@ var cliMethods = typeof(CLI).GetMethods(BindingFlags.Public | BindingFlags.Insta
 
 // Add commands using minimal APIs
 // Please note that names of slash commands must be lowercase.
-applicationCommandService.AddSlashCommand("ping", "Ping!", (string param, bool test) => "Pong!");
+applicationCommandService.AddSlashCommand("ping", "Ping!", () => "Pong!");
 
 applicationCommandService.AddModule<DiscordCommands>();
 

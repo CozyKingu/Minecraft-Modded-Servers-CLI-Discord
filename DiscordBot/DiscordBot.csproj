@@ -21,8 +21,4 @@
     <ProjectReference Include="..\Minecraft Easy Servers\Minecraft Easy Servers.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Helpers\" />
-  </ItemGroup>
-
 </Project>
