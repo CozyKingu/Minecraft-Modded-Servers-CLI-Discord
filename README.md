@@ -203,6 +203,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 
 - **Standalone Clients:** Based on [MultiMC](https://github.com/MultiMC) for easy Minecraft modded client distribution.  
 - **Development Status:** Documentation and releases are being prepared. Stay tuned for updates!
+- **Mod loaders:** Compatible with [Forge](https://github.com/minecraftforge) and [NeoForge](https://github.com/neoforged/NeoForge)
 
 ---
 
