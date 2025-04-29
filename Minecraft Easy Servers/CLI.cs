@@ -17,15 +17,28 @@ namespace Minecraft_Easy_Servers
             IRunner<AddServerMod>, IRunner<AddServerPlugin>, 
             IRunner<RemoveServerMod>, IRunner<RemoveServerPlugin>
     {
+        public ServerManager ServerManager => serverManager;
+        public ConfigManager ConfigManager => configManager;
+
         private readonly ServerManager serverManager;
         private readonly ConfigManager configManager;
-        private readonly ExecuteManager executeManager;
 
-        public CLI(ServerManager serverManager, ConfigManager configManager, ExecuteManager executeManager)
+        public CLI(ServerManager serverManager, ConfigManager configManager)
         {
             this.serverManager = serverManager;
             this.configManager = configManager;
-            this.executeManager = executeManager;
+        }
+
+        public static CLI Create(string? rootPath = null)
+        {
+            var executeManager = new ExecuteManager();
+            var commandManager = new CommandManager();
+
+            ConfigManager.RootPath = rootPath;
+            ServerManager.RootPath = rootPath;
+            var configManager = new ConfigManager(executeManager);
+            var serverManger = new ServerManager(executeManager, commandManager, configManager);
+            return new CLI(serverManger, configManager);
         }
 
         public async Task Run(AddServer options)

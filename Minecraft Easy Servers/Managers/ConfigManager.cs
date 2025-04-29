@@ -16,6 +16,7 @@
         /// Defines the FolderName
         /// </summary>
         public const string FolderName = "configs";
+        public static string? RootPath { get; set; }
 
         /// <summary>
         /// Defines the executeManager
@@ -729,7 +730,10 @@
         /// <returns>The <see cref="string"/></returns>
         private static string GetFolderPath(string name)
         {
-            return Path.Combine(FolderName, name);
+            if (RootPath != null)
+                return Path.Combine(RootPath, FolderName, name);
+            else
+                return Path.Combine(FolderName, name);
         }
 
         /// <summary>

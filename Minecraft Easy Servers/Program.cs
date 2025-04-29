@@ -5,24 +5,11 @@ using Minecraft_Easy_Servers.Helpers;
 using Minecraft_Easy_Servers.Managers;
 
 
-bool debug = false;
 
-var executeManager = new ExecuteManager();
-var commandManager = new CommandManager();
-var configManager = new ConfigManager(executeManager);
-var serverManger = new ServerManager(executeManager, commandManager, configManager);
-var commandLineRunner = new CLI(serverManger, configManager, executeManager);
+var commandLineRunner = CLI.Create();
+
 await SetupCommandLineRunner(args, commandLineRunner);
 
-if (debug)
-{
-    //serverManger.RemoveServer("server1");
-    //await serverManger.CreateServer("server1", "1.20.4");
-    // var port = serverManger.GetPort("server1");
-    // serverManger.UpServer("server1");
-    var status = await serverManger.StatusServer("server1");
-    Console.WriteLine(Enum.GetName(typeof(ServerStatus), status));
-}
 
 static async Task SetupCommandLineRunner(string[] args, CLI minecraftCommandLineRunner)
 {
