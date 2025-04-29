@@ -56,20 +56,24 @@ namespace Minecraft_Easy_Servers.Managers
             return ack;
         }
 
-        public bool ExecuteScriptAndStop(string command, string stopSubString, string errorSubstring)
+        public bool ExecuteScriptAndStop(string command, string stopSubString, string errorSubstring, string? killSubstring = null)
         {
             var workingDirectory = Path.GetDirectoryName(command);
             var fileName = Path.GetFileName(command);
+
+            int? pid = null;
+
             bool ack = false;
             bool errorAck = false;
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = command,
-                    Arguments = "",
+                    FileName = GetShellFileName(),
+                    Arguments = GetRunScriptShellArguments(Path.GetFileName(command)),
                     RedirectStandardOutput = true,
                     RedirectStandardInput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = false,
                     WorkingDirectory = workingDirectory
@@ -82,21 +86,64 @@ namespace Minecraft_Easy_Servers.Managers
                 if (args.Data.Contains(stopSubString))
                 {
                     process.StandardInput.Write("stop\n");
+                    process.StandardInput.Close();
                     ack = true;
                 }
                 if (args.Data.Contains(errorSubstring))
                 {
                     errorAck = true;
                 }
-                if (ack || errorAck)
+                if (killSubstring != null && args.Data.Contains(killSubstring))
                 {
-                    process.StandardInput.Write("k\n");
+                    var javaProcess = Process.GetProcesses()
+                        .Where(x => x.ProcessName.Contains("java"))
+                        .OrderByDescending(x =>
+                        {
+                            try
+                            {
+                                return x.StartTime; // Sort by start time (most recent first)
+                            }
+                            catch
+                            {
+                                return DateTime.MinValue; // If StartTime is inaccessible, assign a default value
+                            }
+                        })
+                        .FirstOrDefault();
+
+                    if (javaProcess != null)
+                    {
+                        Console.WriteLine($"Latest Java process found: PID={javaProcess.Id}, StartTime={javaProcess.StartTime}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("No Java process found or unable to determine the latest process.");
+                    }
+                    if (javaProcess != null)
+                    {
+                        // Hours spent on this fcking problem: 5 hours
+                        // Java process needs to be killed because of first boot up server hanging that occurs oftenly unfortunately.
+                        Console.WriteLine($"Killing process {javaProcess.Id}");
+                        javaProcess.Kill();
+                    }
+                }
+            };
+            process.ErrorDataReceived += (sender, args) =>
+            {
+                if (args.Data == null) return;
+                Console.WriteLine(args.Data);
+                if (args.Data.Contains(errorSubstring))
+                {
+                    errorAck = true;
                 }
             };
 
             process.Start();
+            pid = process.Id;
             process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
             process.WaitForExit();
+                if (errorAck)
+                Console.WriteLine($"Warning ! Some error have been met during first run. You can still run the server, but make sure the worlds or the mods are compatible to each other.");
             return ack;
         }
 

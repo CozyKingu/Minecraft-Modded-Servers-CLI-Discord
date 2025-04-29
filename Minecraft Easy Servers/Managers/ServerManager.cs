@@ -34,7 +34,7 @@ namespace Minecraft_Easy_Servers.Managers
             await MinecraftDownloader.DownloadVanillaMinecraftServer(version, GetFolderPath(name));
             Console.WriteLine($"Download of server version {version} finished. Initializing server with first boot-up...");
 
-            var success = FirstRunServer(name);
+            var success = FirstRunServerHardMode(name);
         }
 
         public async Task CreateServer(
@@ -61,17 +61,20 @@ namespace Minecraft_Easy_Servers.Managers
 
             try
             {
-                string defaultWorld = configManager.Read(configName).Server.DefaultWorld;
-                if (!string.IsNullOrEmpty(defaultWorld))
-                {
-                    Console.WriteLine($"Default world found in config {defaultWorld}.");
-                    var worldDirectoryPath = Directory.EnumerateDirectories(GetFolderPath(name), $"{defaultWorld}_*").FirstOrDefault();
-                    if (worldDirectoryPath is null)
-                        throw new ManagerException($"The configuration {defaultWorld} is not found in {name} server folder");
+                string modloader = configManager.Read(configName).ModLoader;
 
-                    UpdateServerPropertiesValue(name, "level-name", Path.GetFileName(worldDirectoryPath) !);
+                string defaultworld = configManager.Read(configName).Server.DefaultWorld;
+                if (!string.IsNullOrEmpty(defaultworld))
+                {
+                    Console.WriteLine($"Default world found in config {defaultworld}.");
+                    var worldDirectoryPath = Directory.EnumerateDirectories(GetFolderPath(name), $"{defaultworld}_*").FirstOrDefault();
+                    if (worldDirectoryPath is null)
+                        throw new ManagerException($"The configuration {defaultworld} is not found in {name} server folder");
+
+                    UpdateServerPropertiesValue(name, "level-name", Path.GetFileName(worldDirectoryPath)!);
                 }
 
+                // TODO: Give a check to resource pack because not sent to client.
                 string defaultResourcePack = configManager.Read(configName).Server.ResourcePack;
                 if (!string.IsNullOrEmpty(defaultResourcePack))
                 {
@@ -82,9 +85,18 @@ namespace Minecraft_Easy_Servers.Managers
                     UpdateServerPropertiesValue(name, "resource-pack", resourcePackDirectoryPath!);
                 }
 
-                var success = FirstRunServer(name);
-                if (!success)
-                    throw new ManagerException("Server first run failed. Server removed.");
+                if (modloader == "vanilla")
+                {
+                    var success = FirstRunServerHardMode(name);
+                    if (!success)
+                        throw new ManagerException("Server first run failed. Server removed.");
+                }
+                else
+                {
+                    var success = FirstRunServerHardMode(name); // Running server by applying usual process.
+                    if (!success)
+                        throw new ManagerException("Server first run failed. Server removed.");
+                }
             } catch (Exception)
             {
                 await RemoveServer(name);
@@ -142,7 +154,7 @@ namespace Minecraft_Easy_Servers.Managers
             {
                 // Remove :exit line and pause line from script
                 var lines = File.ReadAllLines(scriptAbsolutePath);
-                var newLines = lines.Where(x => !x.Contains(":exit") && !x.Contains("pause")).ToArray();
+                var newLines = lines.Where(x => !x.Contains("pause")).ToArray();
                 File.WriteAllLines(scriptAbsolutePath, newLines);
 
                 // Add nogui parameter in script before %*
@@ -253,7 +265,7 @@ namespace Minecraft_Easy_Servers.Managers
             return Path.Combine(FolderName, name);
         }
 
-        private bool FirstRunServer(string name)
+        private bool FirstRunServerHardMode(string name)
         {
             string runScriptPath = GetServerRunAbsoluteScriptPath(name);
             string serverJar = GetServerJar(name);
@@ -264,7 +276,7 @@ namespace Minecraft_Easy_Servers.Managers
                 if (File.Exists(runScriptPath))
                 {
                     var lines = File.ReadAllLines(runScriptPath);
-                    var newLines = lines.Where(x => !x.Contains(":exit") && !x.Contains("pause")).ToArray();
+                    var newLines = lines.Where(x => !x.Contains("pause")).ToArray();
                     File.WriteAllLines(runScriptPath, newLines);
 
                     // Add nogui parameter in script before %*
@@ -275,7 +287,7 @@ namespace Minecraft_Easy_Servers.Managers
                         File.WriteAllText(runScriptPath, scriptContent);
                     }
                 }
-                return executeManager.ExecuteScriptAndStop(runScriptPath, "Done", "/ERROR");
+                return executeManager.ExecuteScriptAndStop(runScriptPath, "Done", "/ERROR", "All dimensions are saved"); // server can hang on "All dimensions are saved"
             }
             else if (File.Exists(serverJar))
             {
@@ -284,6 +296,37 @@ namespace Minecraft_Easy_Servers.Managers
             else
             {
                 throw new ManagerException($"No run script or jar file in {name} server folder");
+            }
+        }
+
+        private async Task<bool> FirstRunServerSoft(string name)
+        {
+            try
+            {
+                UpServer(name, 25565);
+                var status = await StatusServer(name);
+                if (status == ServerStatus.NONE)
+                {
+                    Console.WriteLine("Server failed to run.");
+                } else if (status == ServerStatus.PROCESS_RUNNING)
+                {
+                    Console.WriteLine("Server process is running, but is not listening. RCON is not working properly, maybe to misconfigurations.");
+                }
+                else if (status == ServerStatus.LISTENING)
+                {
+                    Console.WriteLine("Server is listening on its first run ! Congrats.");
+                }
+
+                if (status == ServerStatus.PROCESS_RUNNING || status == ServerStatus.LISTENING)
+                {
+                    Console.WriteLine("Server first run finished. Shutting down server...");
+                    await DownServer(name);
+                }
+                return true;
+            } catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                return false;
             }
         }
 
@@ -301,7 +344,7 @@ namespace Minecraft_Easy_Servers.Managers
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
-            string serverPropertiesFilePath = GetServerPropertiesPath(name);
+            string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
             var properties = new JavaProperties();
 
             using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
@@ -316,7 +359,7 @@ namespace Minecraft_Easy_Servers.Managers
         {
             if (!ServerExists(name))
                 throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
-            string serverPropertiesFilePath = GetServerPropertiesPath(name);
+            string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
             var properties = new JavaProperties();
             using (FileStream streamIn = new(serverPropertiesFilePath, FileMode.Open))
             {
@@ -332,11 +375,13 @@ namespace Minecraft_Easy_Servers.Managers
             return true;
         }
 
-        private static string GetServerPropertiesPath(string name)
+        private static string GetOrCreateServerPropertiesPath(string name)
         {
             string serverPropertiesFilePath = Path.Combine(GetFolderPath(name), "server.properties");
             if (!File.Exists(serverPropertiesFilePath))
-                throw new ManagerException($"No server.properties in {name} server folder");
+            {
+                File.Create(serverPropertiesFilePath).Dispose();
+            }
             return serverPropertiesFilePath;
         }
 
