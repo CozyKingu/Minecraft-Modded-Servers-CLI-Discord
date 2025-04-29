@@ -11,7 +11,11 @@ namespace Minecraft_Easy_Servers
             // Remove commands
             IRunner<RemoveServer>, IRunner<RemoveConfig>, IRunner<RemoveMod>, IRunner<RemovePlugin>, IRunner<RemoveResourcePack>, IRunner<RemoveWorld>,
             // Server execution commands
-            IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>
+            IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>,
+            // Server assets changements when already instanciated
+            IRunner<SetServerWorld>, IRunner<SetServerResourcePack>, IRunner<SetServerProperty>,
+            IRunner<AddServerMod>, IRunner<AddServerPlugin>, 
+            IRunner<RemoveServerMod>, IRunner<RemoveServerPlugin>
     {
         private readonly ServerManager serverManager;
         private readonly ConfigManager configManager;
@@ -118,6 +122,45 @@ namespace Minecraft_Easy_Servers
         public async Task Run(AddWorld options)
         {
             await configManager.AddWorld(options.ConfigName, options.Name, options.Link, options.ServerDefault);
+        }
+
+        public async Task Run(SetServerWorld options)
+        {
+            await serverManager.SetServerWorld(options.ServerName, options.Link);
+        }
+
+        public Task Run(SetServerResourcePack options)
+        {
+            serverManager.SetServerResourcePack(options.ServerName, options.Link);
+            return Task.CompletedTask;
+        }
+
+        public Task Run(SetServerProperty options)
+        {
+            serverManager.SetServerProperty(options.ServerName, options.KeyValue);
+            return Task.CompletedTask;
+        }
+
+        public async Task Run(AddServerMod options)
+        {
+            await serverManager.AddServerMod(options.ServerName, options.Name, options.Link);
+        }
+
+        public async Task Run(AddServerPlugin options)
+        {
+            await serverManager.AddServerPlugin(options.ServerName, options.Name, options.Link);
+        }
+
+        public async Task Run(RemoveServerMod options)
+        {
+            serverManager.RemoveServerMod(options.ServerName, options.Name);
+            await Task.CompletedTask;
+        }
+
+        public async Task Run(RemoveServerPlugin options)
+        {
+            serverManager.RemoveServerPlugin(options.ServerName, options.Name);
+            await Task.CompletedTask;
         }
     }
 }

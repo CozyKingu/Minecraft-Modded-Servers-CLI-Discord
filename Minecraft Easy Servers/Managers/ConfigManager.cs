@@ -185,7 +185,7 @@
                 var mcClient = await MinecraftDownloader.DownloadMultiMCArchive(os, baseMultiMCClientPath);
                 var folderMcClient = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(mcClient, baseMultiMCClientPath, os, searchForFileWithExtension: null, contentIsFolder: true);
 
-                var mcClientNewInstancePath = Path.Combine(folderMcClient, "instances", $"{name}_{version}");
+                var mcClientNewInstancePath = Path.Combine(GetMultiMCInstancesPath(name, os), $"{name}_{version}");
                 Directory.CreateDirectory(mcClientNewInstancePath);
 
                 // Create .minecraft and subdirectories
@@ -233,8 +233,7 @@
             foreach (var os in osList)
             {
                 // Handle MultiMC client
-                string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
-                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetFolder);
+                var multiMCInstanceAssetPath = Path.Combine(GetMultiMCInstancesPath(name, os), $"{name}_{version}", ".minecraft", assetFolder);
                 if (!Directory.Exists(multiMCInstanceAssetPath))
                     throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
 
@@ -288,8 +287,7 @@
             foreach (var os in osList)
             {
                 // Handle MultiMC client
-                string multiMCOsFolder = $"{os}_MultiMC" + (os == "mac" ? ".app" : string.Empty);
-                var multiMCInstanceAssetPath = Path.Combine(GetBaseMultiMCClientPath(name), multiMCOsFolder, "instances", $"{name}_{version}", ".minecraft", assetFolder);
+                var multiMCInstanceAssetPath = Path.Combine(GetMultiMCInstancesPath(name, os), $"{name}_{version}", ".minecraft", assetFolder);
                 if (!Directory.Exists(multiMCInstanceAssetPath))
                     throw new ManagerException($"MultiMC instance path for {os} does not exist. Ensure the client is prepared.");
 
@@ -1056,6 +1054,28 @@
         public static string GetBaseMultiMCClientPath(string name)
         {
             return Path.Combine(GetFolderPath(name), "baseMultiMCClient");
+        }
+
+        private static string GetMultiMCInstancesPath(string configName, string platform)
+        {
+            return platform switch
+            {
+                "windows" => Path.Combine(GetMultiMCClientPath(configName, platform), "instances"),
+                "linux" => Path.Combine(GetMultiMCClientPath(configName, platform), "bin", "instances"),
+                "mac" => Path.Combine(GetMultiMCClientPath(configName, platform), "Contents", "MacOS", "instances"),
+                _ => throw new ManagerException($"Unsupported platform: {platform}")
+            };
+        }
+
+        private static string GetMultiMCClientPath(string configName, string platform)
+        {
+            return platform switch
+            {
+                "windows" => Path.Combine(GetBaseMultiMCClientPath(configName), "windows_MultiMC"),
+                "linux" => Path.Combine(GetBaseMultiMCClientPath(configName), "linux_MultiMC"),
+                "mac" => Path.Combine(GetBaseMultiMCClientPath(configName), "mac_MultiMC.app"),
+                _ => throw new ManagerException($"Unsupported platform: {platform}")
+            };
         }
 
         /// <summary>

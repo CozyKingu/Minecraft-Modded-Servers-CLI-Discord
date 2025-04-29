@@ -57,6 +57,8 @@ namespace Minecraft_Easy_Servers.Managers
             CopyDirectory(diyClientPath, GetDiyClientPath(name));
             CopyDirectory(multiMCClientsPath, GetMultiMCClientsPath(name));
 
+            UpdateMultiMCInstanceConfig(name);
+
             CopyAssetToFolder(GetFolderPath(name), "server.properties");
 
             try
@@ -327,6 +329,153 @@ namespace Minecraft_Easy_Servers.Managers
             }
         }
 
+        public async Task AddServerMod(string serverName, string modName, string link)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            string modsFolderPath = Path.Combine(GetFolderPath(serverName), "mods");
+            if (!Directory.Exists(modsFolderPath))
+                Directory.CreateDirectory(modsFolderPath);
+
+            string? modFilePath = await DownloadOrCopyAssetAsync(
+                destinationPath: modsFolderPath,
+                assetName: modName,
+                assetLink: link,
+                searchForFileWithExtension: ".jar",
+                contentIsFolder: false);
+
+            if (modFilePath is null)
+                throw new ManagerException($"Failed to add mod {modName} to server {serverName}.");
+
+            // Sync to DIY Client
+            string diyClientModsPath = Path.Combine(GetDiyClientPath(serverName), "mods");
+            if (!Directory.Exists(diyClientModsPath))
+                Directory.CreateDirectory(diyClientModsPath);
+            File.Copy(modFilePath, Path.Combine(diyClientModsPath, Path.GetFileName(modFilePath)), true);
+
+            // Sync to MultiMC Clients
+            SyncModToMultiMCClients(serverName, modFilePath);
+
+            Console.WriteLine($"Mod {modName} added to server {serverName}.");
+        }
+
+        public void RemoveServerMod(string serverName, string modName)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            string modsFolderPath = Path.Combine(GetFolderPath(serverName), "mods");
+            string modFilePrefix = $"{modName}_";
+
+            var modFiles = Directory.GetFiles(modsFolderPath, $"{modFilePrefix}*");
+            if (modFiles.Length == 0)
+                throw new ManagerException($"Mod {modName} not found in server {serverName}.");
+
+            foreach (var modFile in modFiles)
+                File.Delete(modFile);
+
+            // Sync removal from DIY Client
+            string diyClientModsPath = Path.Combine(GetDiyClientPath(serverName), "mods");
+            var diyModFiles = Directory.GetFiles(diyClientModsPath, $"{modFilePrefix}*");
+            foreach (var diyModFile in diyModFiles)
+                File.Delete(diyModFile);
+
+            // Sync removal from MultiMC Clients
+            RemoveModFromMultiMCClients(serverName, modFilePrefix);
+
+            Console.WriteLine($"Mod {modName} removed from server {serverName}.");
+        }
+
+        public async Task AddServerPlugin(string serverName, string pluginName, string link)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            string pluginsFolderPath = Path.Combine(GetFolderPath(serverName), "plugins");
+            if (!Directory.Exists(pluginsFolderPath))
+                Directory.CreateDirectory(pluginsFolderPath);
+
+            string? pluginFilePath = await DownloadOrCopyAssetAsync(
+                destinationPath: pluginsFolderPath,
+                assetName: pluginName,
+                assetLink: link,
+                searchForFileWithExtension: ".jar",
+                contentIsFolder: false);
+
+            if (pluginFilePath is null)
+                throw new ManagerException($"Failed to add plugin {pluginName} to server {serverName}.");
+
+            Console.WriteLine($"Plugin {pluginName} added to server {serverName}.");
+        }
+
+        public void RemoveServerPlugin(string serverName, string pluginName)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            string pluginsFolderPath = Path.Combine(GetFolderPath(serverName), "plugins");
+            string pluginFilePrefix = $"{pluginName}_";
+
+            var pluginFiles = Directory.GetFiles(pluginsFolderPath, $"{pluginFilePrefix}*");
+            if (pluginFiles.Length == 0)
+                throw new ManagerException($"Plugin {pluginName} not found in server {serverName}.");
+
+            foreach (var pluginFile in pluginFiles)
+                File.Delete(pluginFile);
+
+            Console.WriteLine($"Plugin {pluginName} removed from server {serverName}.");
+        }
+
+        public async Task SetServerWorld(string serverName, string link)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            string worldFolderPath = Path.Combine(GetFolderPath(serverName), "world");
+            if (Directory.Exists(worldFolderPath))
+                Directory.Delete(worldFolderPath, true);
+
+            string? worldPath = await DownloadOrCopyAssetAsync(
+                destinationPath: GetFolderPath(serverName),
+                assetName: "world",
+                assetLink: link,
+                searchForFileWithExtension: null,
+                contentIsFolder: true) ?? throw new ManagerException("World folder not found when downloading or retrieving asset.");
+
+            UpdateServerPropertiesValue(serverName, "level-name", Path.GetFileName(worldPath));
+
+            Console.WriteLine($"World set for server {serverName}.");
+        }
+
+        public void SetServerResourcePack(string serverName, string link)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            if (!link.StartsWith("http") && !link.StartsWith("https"))
+                throw new ManagerException("Resource pack link must be a valid HTTP/HTTPS URL.");
+
+            UpdateServerPropertiesValue(serverName, "resource-pack", link);
+            Console.WriteLine($"Resource pack set for server {serverName}.");
+        }
+
+        public void SetServerProperty(string serverName, string keyValue)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+
+            var keyValueParts = keyValue.Split('=', 2);
+            if (keyValueParts.Length != 2)
+                throw new ManagerException("Invalid key=value format.");
+
+            string key = keyValueParts[0].Trim();
+            string value = keyValueParts[1].Trim();
+
+            UpdateServerPropertiesValue(serverName, key, value);
+            Console.WriteLine($"Property {key} set to {value} for server {serverName}.");
+        }
+
         public int GetPort(string name)
         {
             return int.Parse(GetServerPropertiesValue(name, "server-port"));
@@ -443,6 +592,145 @@ namespace Minecraft_Easy_Servers.Managers
         private static void CopyAssetToFolder(string folderPath, string assetFile)
         {
             File.Copy(Path.Combine(AssetsFolder, assetFile), Path.Combine(folderPath, assetFile));
+        }
+
+        private static async Task<string?> DownloadOrCopyAssetAsync(
+            string destinationPath,
+            string assetName,
+            string assetLink,
+            string? searchForFileWithExtension,
+            bool contentIsFolder = false)
+        {
+            string filePath;
+            if (!(assetLink.Contains("http") || assetLink.Contains("https")))
+            {
+                if (!File.Exists(assetLink))
+                    throw new ManagerException($"Asset link is not an URL nor a valid filePath");
+
+                if ((searchForFileWithExtension != null && !assetLink.Contains(searchForFileWithExtension) && !contentIsFolder && !assetLink.Contains(".zip")))
+                    throw new Exception($"Asset link {assetLink} does not contain the expected file extension {searchForFileWithExtension}");
+
+                if (searchForFileWithExtension != null && assetLink.Contains(searchForFileWithExtension))
+                {
+                    // Copy file and finish.
+                    string destPath = Path.Combine(destinationPath, $"{assetName}_{Path.GetFileName(assetLink)}");
+                    File.Copy(assetLink, destPath, true);
+                    return destPath;
+                }
+                else
+                    filePath = assetLink;
+            }
+            else
+                filePath = await MinecraftDownloader.DownloadFile(destinationPath, assetLink, prefixName: assetName);
+
+            if (Path.GetExtension(filePath).Equals(".zip", StringComparison.OrdinalIgnoreCase) && searchForFileWithExtension != ".zip")
+            {
+                var contentPath = ArchiveHelper.ExtractArchiveAndIsolateContentAddPrefix(
+                    archivePath: filePath,
+                    directoryForContentPath: destinationPath,
+                    prefixName: assetName,
+                    searchForFileWithExtension: searchForFileWithExtension,
+                    contentIsFolder: contentIsFolder);
+                return contentPath;
+            }
+
+            // No asset file found.
+            return null;
+        }
+        
+        private static string GetMultiMCInstancesPath(string serverName, string platform)
+        {
+            return platform switch
+            {
+                "windows" => Path.Combine(GetMultiMCClientPath(serverName, platform), "instances"),
+                "linux" => Path.Combine(GetMultiMCClientPath(serverName, platform), "bin", "instances"),
+                "mac" => Path.Combine(GetMultiMCClientPath(serverName, platform), "Contents", "MacOS", "instances"),
+                _ => throw new ManagerException($"Unsupported platform: {platform}")
+            };
+        }
+        
+        private static string GetMultiMCClientPath(string serverName, string platform)
+        {
+            return platform switch
+            {
+                "windows" => Path.Combine(GetMultiMCClientsPath(serverName),"windows_MultiMC"),
+                "linux" => Path.Combine(GetMultiMCClientsPath(serverName), "linux_MultiMC"),
+                "mac" => Path.Combine(GetMultiMCClientsPath(serverName), "mac_MultiMC.app"),
+                _ => throw new ManagerException($"Unsupported platform: {platform}")
+            };
+        }
+
+        private static string GetMultiMCModsPath(string instancePath)
+        {
+            return Path.Combine(instancePath, ".minecraft", "mods");
+        }
+
+        public void SyncModToMultiMCClients(string serverName, string modFilePath)
+        {
+            string[] platforms = { "windows", "linux", "mac" };
+            foreach (var platform in platforms)
+            {
+                string instancesPath = GetMultiMCInstancesPath(serverName, platform);
+                string? instancePath = Directory.EnumerateDirectories(instancesPath, $"{serverName}_*", SearchOption.AllDirectories).FirstOrDefault();
+                if (instancePath != null)
+                {
+                    string multiMCModsPath = GetMultiMCModsPath(instancePath);
+                    if (!Directory.Exists(multiMCModsPath))
+                        Directory.CreateDirectory(multiMCModsPath);
+                    File.Copy(modFilePath, Path.Combine(multiMCModsPath, Path.GetFileName(modFilePath)), true);
+                }
+            }
+        }
+
+        public void RemoveModFromMultiMCClients(string serverName, string modFilePrefix)
+        {
+            string[] platforms = { "windows", "linux", "mac" };
+            foreach (var platform in platforms)
+            {
+                string instancesPath = GetMultiMCInstancesPath(serverName, platform);
+                string? instancePath = Directory.EnumerateDirectories(instancesPath, $"{serverName}_*", SearchOption.AllDirectories).FirstOrDefault();
+                if (instancePath != null)
+                {
+                    string multiMCModsPath = GetMultiMCModsPath(instancePath);
+                    var multiMCModFiles = Directory.GetFiles(multiMCModsPath, $"{modFilePrefix}*");
+                    foreach (var multiMCModFile in multiMCModFiles)
+                        File.Delete(multiMCModFile);
+                }
+            }
+        }
+        public void UpdateMultiMCInstanceConfig(string serverName)
+        {
+            string[] platforms = { "windows", "linux", "mac" };
+            foreach (var platform in platforms)
+            {
+                string instancesPath = GetMultiMCInstancesPath(serverName, platform);
+                string? instancePath = Directory.EnumerateDirectories(instancesPath, $"*_*", SearchOption.AllDirectories).FirstOrDefault();
+
+                if (instancePath != null)
+                {
+                    string newInstanceName = $"{serverName}_{Path.GetFileName(instancePath).Split('_', 2)[1]}";
+                    string configFilePath = Path.Combine(instancePath, "instance.cfg");
+                    if (File.Exists(configFilePath))
+                    {
+                        var lines = File.ReadAllLines(configFilePath);
+                        for (int i = 0; i < lines.Length; i++)
+                        {
+                            if (lines[i].StartsWith("name="))
+                            {
+                                lines[i] = $"name={newInstanceName}";
+                            }
+                        }
+                        File.WriteAllLines(configFilePath, lines);
+                    }
+
+                    // Rename the folder to ensure the first part matches the serverName  
+                    string newInstancePath = Path.Combine(Path.GetDirectoryName(instancePath)!, newInstanceName);
+                    if (!instancePath.Equals(newInstancePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Directory.Move(instancePath, newInstancePath);
+                    }
+                }
+            }
         }
     }
 }
