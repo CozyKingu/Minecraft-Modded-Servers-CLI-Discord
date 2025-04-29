@@ -9,6 +9,7 @@ namespace Minecraft_Easy_Servers.Managers
         private readonly ExecuteManager executeManager;
         private readonly CommandManager commandManager;
         private readonly ConfigManager configManager;
+        public static string? RootPath { get; set; }
         public const string FolderName = "servers";
         private const string AssetsFolder = "Assets";
         private const int RCON_PORT_OFFSET = 100;
@@ -260,7 +261,10 @@ namespace Minecraft_Easy_Servers.Managers
 
         private static string GetFolderPath(string name)
         {
-            return Path.Combine(FolderName, name);
+            if (RootPath != null)
+                return Path.Combine(RootPath, FolderName, name);
+            else
+                return Path.Combine(FolderName, name);
         }
 
         private bool FirstRunServerHardMode(string name)
