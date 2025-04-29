@@ -1,12 +1,10 @@
-﻿using CommandLine;
-using DiscordBot;
+﻿using DiscordBot;
 using Minecraft_Easy_Servers;
 using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;
 using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 
@@ -23,9 +21,6 @@ GatewayClient client = new(new BotToken(token.GetString()!), new GatewayClientCo
 
 // Create the application command service
 ApplicationCommandService<ApplicationCommandContext> applicationCommandService = new();
-
-var cliMethods = typeof(CLI).GetMethods(BindingFlags.Public | BindingFlags.Instance)
-    .Where(m => m.Name == "Run" && m.GetParameters().Length == 1);
 
 // Add commands using minimal APIs
 // Please note that names of slash commands must be lowercase.
@@ -57,19 +52,14 @@ client.InteractionCreate += async interaction =>
     }
 };
 
-
-
-
 // Create the commands so that you can use them in the Discord client
 await applicationCommandService.CreateCommandsAsync(client.Rest, client.Id);
-
 
 client.Log += message =>
 {
     Console.WriteLine(message);
     return default;
 };
-
 
 await client.StartAsync();
 await Task.Delay(-1);
