@@ -211,7 +211,7 @@ Easily create servers, manage configurations, and sync mods and assets without m
 
 ## TODO
 
-- **Support Spigot**
+- **Support Spigot**: For the moment, it can be installed manually
 - **Delivery of clients, MCClient Exports on Discord**
 
 ---
