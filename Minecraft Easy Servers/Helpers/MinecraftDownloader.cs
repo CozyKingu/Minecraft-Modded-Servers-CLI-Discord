@@ -160,16 +160,30 @@ namespace Minecraft_Easy_Servers.Helpers
                 var response = await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead);
                 response.EnsureSuccessStatusCode();
 
+                if (response.RequestMessage?.RequestUri != null)
+                {
+                    // Remove query parameters from the URL
+                    var uriWithoutQuery = new UriBuilder(response.RequestMessage.RequestUri)
+                    {
+                        Query = string.Empty
+                    }.Uri;
+
+                    // Retry the request with the cleaned URL
+                    link = uriWithoutQuery.AbsoluteUri;
+                    response = await httpClient.GetAsync(uriWithoutQuery, HttpCompletionOption.ResponseHeadersRead);
+                    response.EnsureSuccessStatusCode();
+                }
+
                 // Extract the file name from the Content-Disposition header if available
                 var contentDisposition = response.Content.Headers.ContentDisposition;
                 var fileName = contentDisposition?.FileNameStar ?? contentDisposition?.FileName;
 
                 if (string.IsNullOrEmpty(fileName) && !UrlLooksLikeFile(link, out fileName))
-                    throw new Exception("Filname cannot be determined.");
+                    throw new Exception("Filename cannot be determined.");
 
                 // Combine the directory path with the file name
-                fileName = prefixName  != null ? fileName = prefixName + "_" + fileName : fileName;
-                var targetFilePath = Path.Combine(targetDirectoryPath, fileName !);
+                fileName = prefixName != null ? prefixName + "_" + fileName : fileName;
+                var targetFilePath = Path.Combine(targetDirectoryPath, fileName!);
 
                 using var fileStream = new FileStream(targetFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
                 await response.Content.CopyToAsync(fileStream);
