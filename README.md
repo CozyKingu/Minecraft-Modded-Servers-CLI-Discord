@@ -207,6 +207,17 @@ Easily create servers, manage configurations, and sync mods and assets without m
 
 ---
 
+
+---
+
+## TODO
+
+- **Support Spigot**
+- **Delivery of clients, MCClient Exports on Discord**
+- **Development Status:** 
+
+---
+
 ## License
 
 This project is licensed under the MIT license. See the `LICENSE` file for more information.
