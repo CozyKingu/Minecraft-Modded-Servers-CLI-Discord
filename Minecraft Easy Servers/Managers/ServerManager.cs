@@ -656,6 +656,8 @@ namespace Minecraft_Easy_Servers.Managers
                     contentIsFolder: contentIsFolder);
                 return contentPath;
             }
+            else if (searchForFileWithExtension != null && filePath.Contains(searchForFileWithExtension))
+                return filePath;
 
             // No asset file found.
             return null;

@@ -949,6 +949,8 @@
                     contentIsFolder: contentIsFolder);
                 return contentPath;
             }
+            else if (searchForFileWithExtension != null && filePath.Contains(searchForFileWithExtension))
+                return filePath;
 
             // No asset file found.
             return null;

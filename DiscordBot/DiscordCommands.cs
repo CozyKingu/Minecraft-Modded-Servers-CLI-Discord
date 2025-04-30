@@ -1,4 +1,5 @@
-﻿using Minecraft_Easy_Servers;
+﻿using DiscordBot.Helpers;
+using Minecraft_Easy_Servers;
 using Minecraft_Easy_Servers.Commands;
 using Minecraft_Easy_Servers.Helpers;
 using NetCord.Rest;
@@ -11,7 +12,7 @@ namespace DiscordBot
     public class DiscordCommands : ApplicationCommandModule<ApplicationCommandContext>
     {
         private const int DISCORD_MESSAGE_LIMIT = 2000;
-        private const int ONE_MESSAGE_EDIT_PER_MILLISECONDS = 1000;
+        private const int ONE_MESSAGE_PER_MILLISECONDS = 1000;
         private static readonly CLI CLI = GetCLI();
 
         private static CLI GetCLI()
@@ -42,7 +43,7 @@ namespace DiscordBot
                 Name = configName,
                 ModLoader = modLoader,
                 Version = version
-            }), "add-config", await Context.Channel.SendMessageAsync("Creating config..."), TimeSpan.FromSeconds(60));
+            }), "add-config", await Context.Channel.SendMessageAsync("Creating config..."), TimeSpan.FromMinutes(5), lastNumberLines: 5);
         }
 
         [SlashCommand("status-server", "Checks the status of a server.")]
@@ -294,7 +295,20 @@ namespace DiscordBot
             }));
         }
 
-        public string RunBigCommand(Func<Task> operation, string commandName, RestMessage editableMessage, TimeSpan timeout)
+        [SlashCommand("restart", "restart the discord bot")]
+        public string Restart()
+        {
+            var channelId = Context.Channel.Id;
+            _ = Task.Run(() =>
+            {
+                Thread.Sleep(2000);
+                RestartHelper.RestartBot(channelId);
+            });
+
+            return "Restarting bot... Don't overuse restart, the bot can take a long time to connect again.";
+        }
+
+        public string RunBigCommand(Func<Task> operation, string commandName, RestMessage editableMessage, TimeSpan timeout, int? lastNumberLines = null)
         {
             if (IsRunning)
                 return "Another command is already running.";
@@ -302,9 +316,9 @@ namespace DiscordBot
             IsRunning = true;
 
             var cancellationToken = new CancellationTokenSource(timeout);
+            var pipe = new Pipe();
             _ = Task.Run(async () =>
             {
-                var pipe = new Pipe();
                 using var newOut = new StdOutAndStreamWriter(new StreamWriter(pipe.Writer.AsStream()));
                 Console.SetOut(newOut);
                 using var streamReader = new StreamReader(pipe.Reader.AsStream());
@@ -312,16 +326,25 @@ namespace DiscordBot
                 var currentMessageId = editableMessage.Id;
                 var lastUpdateTime = DateTime.UtcNow;
 
+                var messageLastEditOffset = 0;
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var newLine = await streamReader.ReadLineAsync(cancellationToken.Token);
                     if (newLine == null)
                         break;
 
+                    if (lastNumberLines != null)
+                    {
+                        currentMessage += newLine + "\n";
+                        continue;
+                    }
+
                     if ((currentMessage.Length + newLine.Length) >= DISCORD_MESSAGE_LIMIT)
                     {
-                        var newMessage = await Context.Channel.SendMessageAsync(newLine);
-                        currentMessage = newLine + "\n";
+                        var messageToSend = currentMessage.Substring(messageLastEditOffset);
+                        var newMessage = await Context.Channel.SendMessageAsync(messageToSend);
+                        currentMessage = messageToSend + "\n";
+                        messageLastEditOffset = currentMessage.Length;
                         currentMessageId = newMessage.Id;
                         lastUpdateTime = DateTime.UtcNow;
                     }
@@ -330,23 +353,37 @@ namespace DiscordBot
                         currentMessage += newLine + "\n";
 
                         // Ensure ModifyMessageAsync is called with a max frequency
-                        if ((DateTime.UtcNow - lastUpdateTime).TotalMilliseconds >= ONE_MESSAGE_EDIT_PER_MILLISECONDS)
+                        if ((DateTime.UtcNow - lastUpdateTime).TotalMilliseconds >= ONE_MESSAGE_PER_MILLISECONDS)
                         {
                             await Context.Channel.ModifyMessageAsync(currentMessageId, m =>
                             {
                                 m.Content = currentMessage;
                             }, cancellationToken: cancellationToken.Token);
 
+                            messageLastEditOffset = currentMessage.Length;
+
                             lastUpdateTime = DateTime.UtcNow;
                         }
                     }
                 }
-                pipe.Writer.Complete();
-                var aNewLine = await streamReader.ReadToEndAsync();
-                await Context.Channel.ModifyMessageAsync(currentMessageId, m =>
+                var toEnd = await streamReader.ReadToEndAsync();
+                var finalMessage = currentMessage += toEnd;
+
+                finalMessage = lastNumberLines != null ?
+                    string.Join("\n", currentMessage.Split('\n').Skip(Math.Max(0, finalMessage.Split('\n').Length - lastNumberLines.Value))) :
+                    finalMessage;
+
+                if (lastNumberLines != null)
                 {
-                    m.Content = currentMessage += aNewLine;
-                });
+                    await Context.Channel.SendMessageAsync($"Command finished ! Last {lastNumberLines} lines output: \n" + finalMessage);
+                }
+                else
+                {
+                    await Context.Channel.ModifyMessageAsync(currentMessageId, m =>
+                    {
+                        m.Content = finalMessage;
+                    });
+                }
             });
 
             _ = Task.Run(async () =>
@@ -365,7 +402,8 @@ namespace DiscordBot
                     {
                         await Context.Channel.SendMessageAsync($"{commandName}: Command timed-out");
                     }
-                    Thread.Sleep(1);
+                    pipe.Writer.Complete();
+                    Thread.Sleep(1000);
                     cancellationToken.Cancel();
                     IsRunning = false;
                 }
