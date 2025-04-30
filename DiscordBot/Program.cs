@@ -9,7 +9,7 @@ using System.Reflection;
 using System.Text.Json;
 
 var botConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText("bot.json"));
-if (botConfig == null || (!botConfig.TryGetValue("token", out var token) && string.IsNullOrEmpty(token.GetString())))
+if (botConfig == null || !botConfig.TryGetValue("token", out var token) || string.IsNullOrEmpty(token.GetString()))
 {
     throw new InvalidOperationException("Token not found in bot.json");
 }

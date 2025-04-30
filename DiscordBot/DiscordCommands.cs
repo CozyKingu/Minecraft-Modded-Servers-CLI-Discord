@@ -4,6 +4,7 @@ using Minecraft_Easy_Servers.Helpers;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 using System.IO.Pipelines;
+using System.Text.Json;
 
 namespace DiscordBot
 {
@@ -11,29 +12,37 @@ namespace DiscordBot
     {
         private const int DISCORD_MESSAGE_LIMIT = 2000;
         private const int ONE_MESSAGE_EDIT_PER_MILLISECONDS = 1000;
-        private static readonly CLI CLI = CLI.Create("C:\\Users\\nbout\\source\\repos\\Minecraft Easy Servers\\Minecraft Easy Servers\\bin\\Debug\\net8.0");
+        private static readonly CLI CLI = GetCLI();
+
+        private static CLI GetCLI()
+        {
+            var botConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText("bot.json"));
+            var rootPath = botConfig?.TryGetValue("rootPath", out var path) == true ? path.GetString() : null;
+
+            return string.IsNullOrEmpty(rootPath) ? CLI.Create() : CLI.Create(rootPath);
+        }
 
         private static volatile bool IsRunning = false;
 
-        [SlashCommand("create-server", "Creates a new Minecraft server.")]
-        public async Task<string> CreateServer(string serverName, string configName)
+        [SlashCommand("add-server", "Creates a new Minecraft server.")]
+        public async Task<string> AddServer(string serverName, string configName)
         {
             return RunBigCommand(() => CLI.Run(new AddServer
             {
                 Name = serverName,
                 Config = configName
-            }), "Create Server", await Context.Channel.SendMessageAsync("Creating server..."), TimeSpan.FromSeconds(60));
+            }), "Add Server", await Context.Channel.SendMessageAsync("Creating server..."), TimeSpan.FromSeconds(60));
         }
 
-        [SlashCommand("create-config", "Creates a new server configuration.")]
-        public async Task<string> CreateConfig(string configName, string modLoader, string version)
+        [SlashCommand("add-config", "Creates a new server configuration.")]
+        public async Task<string> AddConfig(string configName, string modLoader, string version)
         {
             return RunBigCommand(() => CLI.Run(new AddConfig
             {
                 Name = configName,
                 ModLoader = modLoader,
                 Version = version
-            }), "Create Config", await Context.Channel.SendMessageAsync("Creating config..."), TimeSpan.FromSeconds(60));
+            }), "add-config", await Context.Channel.SendMessageAsync("Creating config..."), TimeSpan.FromSeconds(60));
         }
 
         [SlashCommand("status-server", "Checks the status of a server.")]
@@ -61,7 +70,26 @@ namespace DiscordBot
             {
                 Name = serverName,
                 Port = port
-            }), "Up Server", await Context.Channel.SendMessageAsync("Creating config..."), TimeSpan.FromSeconds(60));
+            }), "Up Server", await Context.Channel.SendMessageAsync("Launching server ..."), TimeSpan.FromSeconds(60));
+        }
+
+        [SlashCommand("send-command", "Sends a command to a server.")]
+        public async Task<string> SendCommand(string serverName, string command)
+        {
+            // Not a big command, but need to display large text.
+            if (command.Contains("help"))
+            {
+                return RunBigCommand(() => CLI.Run(new SendCommand
+                {
+                    ServerName = serverName,
+                    Command = command
+                }), "Help command", await Context.Channel.SendMessageAsync("Help command result:"), TimeSpan.FromSeconds(5));
+            }
+            return await RunSmallCommand(() => CLI.Run(new SendCommand
+            {
+                ServerName = serverName,
+                Command = command
+            }), displayAllLines: true);
         }
 
         [SlashCommand("remove-server", "Removes a server.")]
@@ -190,6 +218,30 @@ namespace DiscordBot
             }));
         }
 
+        [SlashCommand("list-servers", "Lists all servers.")]
+        public async Task<string> ListServers()
+        {
+            return await RunSmallCommand(() => CLI.Run(new ListServers()), displayAllLines: true);
+        }
+
+        [SlashCommand("list-configs", "Lists all configs.")]
+        public async Task<string> ListConfigs()
+        {
+            return await RunSmallCommand(() => CLI.Run(new ListConfigs()), displayAllLines: true);
+        }
+
+        [SlashCommand("list-assets", "Lists all assets of config.")]
+        public async Task<string> ListAssets(string configName)
+        {
+            return await RunSmallCommand(() => CLI.Run(new ListAssets() { ConfigName = configName }), displayAllLines: true);
+        }
+
+        [SlashCommand("list-server-assets", "Lists all assets of server.")]
+        public async Task<string> ListServerAssets(string serverName)
+        {
+            return await RunSmallCommand(() => CLI.Run(new ListServerAssets() { ServerName = serverName }), displayAllLines: true);
+        }
+
         [SlashCommand("set-server-property", "Sets a property for a server.")]
         public async Task<string> SetServerProperty(string serverName, string keyValue)
         {
@@ -203,14 +255,12 @@ namespace DiscordBot
         [SlashCommand("add-server-mod", "Adds a mod to a server.")]
         public async Task<string> AddServerMod(string serverName, string modName, string link)
         {
-            await CLI.Run(new AddServerMod
+            return await RunSmallCommand(() => CLI.Run(new AddServerMod
             {
                 ServerName = serverName,
                 Name = modName,
                 Link = link
-            });
-
-            return $"Mod '{modName}' added to server '{serverName}'.";
+            }));
         }
 
         [SlashCommand("add-server-plugin", "Adds a plugin to a server.")]
@@ -315,6 +365,7 @@ namespace DiscordBot
                     {
                         await Context.Channel.SendMessageAsync($"{commandName}: Command timed-out");
                     }
+                    Thread.Sleep(1);
                     cancellationToken.Cancel();
                     IsRunning = false;
                 }
@@ -324,7 +375,7 @@ namespace DiscordBot
         }
 
         // Run a small command that returns only the last line ignoring other lines from the stream
-        public async Task<string> RunSmallCommand(Func<Task> operation)
+        public async Task<string> RunSmallCommand(Func<Task> operation, bool displayAllLines = false)
         {
             if (IsRunning)
                 return "Another command is already running.";
@@ -341,15 +392,15 @@ namespace DiscordBot
                 // Read the last line from the MemoryStream
                 memoryStream.Seek(0, SeekOrigin.Begin);
                 using var reader = new StreamReader(memoryStream);
-                string? lastLine = null;
+                string? returnMessage = null;
                 string? currentLine;
 
                 while ((currentLine = await reader.ReadLineAsync()) != null)
                 {
-                    lastLine = currentLine;
+                    returnMessage = displayAllLines ? returnMessage += currentLine + "\n" : currentLine;
                 }
 
-                return lastLine ?? "No output from the command.";
+                return returnMessage ?? "No output from the command.";
             }
             catch (Exception e)
             {

@@ -1,4 +1,5 @@
 {
   "enable": true,
-  "token": ""
+  "token": "",
+  "rootPath": ""
 }

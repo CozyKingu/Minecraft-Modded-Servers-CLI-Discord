@@ -6,5 +6,6 @@
 	"forgeDownloadJar": "https://maven.minecraftforge.net/net/minecraftforge/forge/{mineVersion}-{forgeVersion}/forge-{mineVersion}-{forgeVersion}-installer.jar",
 	"multiMCwin": "https://files.multimc.org/downloads/mmc-develop-win32.zip",
 	"multiMClinux": "https://files.multimc.org/downloads/mmc-develop-lin64.tar.gz",
-	"multiMCmac": "https://files.multimc.org/downloads/mmc-develop-osx64-5.15.2.tar.gz"
+	"multiMCmac": "https://files.multimc.org/downloads/mmc-develop-osx64-5.15.2.tar.gz",
+	"rootPath": ""
 }

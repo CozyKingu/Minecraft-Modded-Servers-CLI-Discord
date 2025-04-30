@@ -2,11 +2,14 @@
 using Minecraft_Easy_Servers;
 using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
-using Minecraft_Easy_Servers.Managers;
 
 
+// read rootPath from json file at the root of the project
+var rootPath = string.Empty;
+rootPath = GlobalConfigHelper.ReadStringProperty("rootPath");
 
-var commandLineRunner = CLI.Create();
+
+CLI commandLineRunner = string.IsNullOrEmpty(rootPath) ? CLI.Create() : CLI.Create(rootPath);
 
 await SetupCommandLineRunner(args, commandLineRunner);
 

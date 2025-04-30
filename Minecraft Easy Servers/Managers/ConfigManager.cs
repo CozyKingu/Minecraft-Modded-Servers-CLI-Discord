@@ -248,6 +248,16 @@
             Console.WriteLine($"Asset {assetName} added to {assetFolder} for all clients.");
         }
 
+        // List all configs in the configs directory, rootPath null or not  
+        public List<string> ListConfigs()
+        {
+            var configsPath = GetConfigsPath();
+            if (!Directory.Exists(configsPath))
+                return new List<string>();
+            var configDirectories = Directory.GetDirectories(configsPath, "*", SearchOption.TopDirectoryOnly);
+            return configDirectories.Select(Path.GetFileName).Where(x => x != null).ToList() !;
+        }
+
         /// <summary>
         /// The GetOrCreateDIYClientAssetPath
         /// </summary>
@@ -519,6 +529,9 @@
         /// <returns>The <see cref="Task"/></returns>
         public async Task AddMod(string name, string modName, string link, ModTypeEnum modType)
         {
+            if (modName.Contains("_"))
+                throw new ManagerException($"Mod name {modName} cannot contain underscores. Please use a different name.");
+
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
 
@@ -570,6 +583,8 @@
         /// <returns>The <see cref="Task"/></returns>
         public async Task AddPlugin(string name, string pluginName, string link)
         {
+            if (pluginName.Contains("_"))
+                throw new ManagerException($"Plugin name {pluginName} cannot contain underscores. Please use a different name.");
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(
@@ -594,6 +609,8 @@
         /// <returns>The <see cref="Task"/></returns>
         public async Task AddResourcePack(string name, string resourcePackName, string link, bool isServerDefault = false)
         {
+            if (resourcePackName.Contains("_"))
+                throw new ManagerException($"Resource pack name {resourcePackName} cannot contain underscores. Please use a different name.");
             if (isServerDefault && !(link.Contains("https") || link.Contains("http")))
             {
                 Console.WriteLine("Server default resource pack must be an http / https link in order to be downloadable. Remove --server-default to put the resource pack in the client.");
@@ -649,6 +666,9 @@
         /// <returns>The <see cref="Task"/></returns>
         public async Task AddWorld(string name, string worldName, string link, bool isServerDefault = false)
         {
+            if (worldName.Contains("_"))
+                throw new ManagerException($"World name {worldName} cannot contain underscores. Please use a different name.");
+
             if (!ConfigExists(name))
                 throw new ManagerException($"Config with name {name} doesn't exists. To create it, run: $ add-config {name}");
             var filePath = await DownloadOrCopyAssetAsync(
@@ -734,6 +754,14 @@
                 return Path.Combine(RootPath, FolderName, name);
             else
                 return Path.Combine(FolderName, name);
+        }
+
+        private static string GetConfigsPath()
+        {
+            if (RootPath != null)
+                return Path.Combine(RootPath, FolderName);
+            else
+                return Path.Combine(FolderName);
         }
 
         /// <summary>

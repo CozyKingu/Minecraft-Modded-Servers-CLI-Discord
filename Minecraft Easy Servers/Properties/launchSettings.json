@@ -20,19 +20,19 @@
       "commandName": "Project",
       "commandLineArgs": "remove-server server2"
     },
-    "Status server 1": {
+    "Status server 2": {
       "commandName": "Project",
-      "commandLineArgs": "status server1"
+      "commandLineArgs": "status server2"
     },
     "Add mod configtest": {
       "commandName": "Project",
       "commandLineArgs": "add-mod configtest the-beast C:\\Users\\user\\Downloads\\The-Beast-1.19.2.zip"
     },
-    "Add config configtest": {
+    "add-config configtest": {
       "commandName": "Project",
       "commandLineArgs": "add-config configtest forge 1.21.4"
     },
-    "Remove config configtest": {
+    "remove-config configtest": {
       "commandName": "Project",
       "commandLineArgs": "remove-config configtest"
     },

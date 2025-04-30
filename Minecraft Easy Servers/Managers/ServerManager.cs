@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Primitives;
 using Minecraft_Easy_Servers.Exceptions;
 using Minecraft_Easy_Servers.Helpers;
+using Minecraft_Easy_Servers.Managers.Models;
 
 namespace Minecraft_Easy_Servers.Managers
 {
@@ -26,7 +27,7 @@ namespace Minecraft_Easy_Servers.Managers
             string version)
         {
             if (ServerExists(name))
-                throw new ManagerException($"Server with name {name} already exists. To remove it, run: $ remove server {name}");
+                throw new ManagerException($"Server with name {name} already exists. To remove it, run: $ remove-server {name}");
 
             Directory.CreateDirectory(GetFolderPath(name));
             const string eulaAsset = "eula.txt";
@@ -43,12 +44,12 @@ namespace Minecraft_Easy_Servers.Managers
             string configName)
         {
             if (ServerExists(name))
-                throw new ManagerException($"Server with name {name} already exists. To remove it, run: $ remove server {name}");
+                throw new ManagerException($"Server with name {name} already exists. To remove it, run: $ remove-server {name}");
             Directory.CreateDirectory(GetFolderPath(name));
             Console.WriteLine($"Download of server version {configName} finished. Initializing server with first boot-up...");
 
             if (!ConfigManager.ConfigExists(configName))
-                throw new ManagerException($"Config with name {configName} doesn't exists. To create it, run: $ add config {configName}");
+                throw new ManagerException($"Config with name {configName} doesn't exists. To create it, run: $ add-config {configName}");
 
             var configBaseServerPath = ConfigManager.GetBaseServerPath(configName);
             var diyClientPath = ConfigManager.GetBaseManualClientPath(configName);
@@ -134,7 +135,7 @@ namespace Minecraft_Easy_Servers.Managers
         public void UpServer(string name, int port)
         {
             if (!ServerExists(name))
-                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add-server {name}");
 
             if (StatusServer(name).Result != ServerStatus.NONE)
                 throw new ManagerException($"Server with name {name} is already running. To stop it, run: $ down {name}");
@@ -210,7 +211,7 @@ namespace Minecraft_Easy_Servers.Managers
         public async Task DownServer(string name)
         {
             if (!ServerExists(name))
-                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add-server {name}");
 
             if (await StatusServer(name) == ServerStatus.NONE)
                 throw new ManagerException($"Server with name {name} is not running. To run it, run: $ up {name}");
@@ -226,6 +227,18 @@ namespace Minecraft_Easy_Servers.Managers
                 Console.WriteLine($"Server failed to shutdown. Force shutdown from task manager (java.exe).");
             else
                 Console.WriteLine($"Server stopped.");
+        }
+
+        public async Task SendCommand(string name, string command)
+        {
+            if (!ServerExists(name))
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add-server {name}");
+            if (await StatusServer(name) != ServerStatus.LISTENING)
+                throw new ManagerException($"Server with name {name} is not listening. Check your server status with $ status {name}");
+            var response = await commandManager.SendCommand(GetRconPort(name), "password", command);
+            if (response is null)
+                throw new ManagerException($"Failed to send command to server {name}.");
+            Console.WriteLine($"Command sent to server {name}: {response}");
         }
 
         public async Task<ServerStatus> StatusServer(string name)
@@ -335,8 +348,11 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddServerMod(string serverName, string modName, string link)
         {
+            if (modName.Contains("_"))
+                throw new ManagerException($"Mod name {modName} cannot contain underscores. Please use a different name.");
+
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             string modsFolderPath = Path.Combine(GetFolderPath(serverName), "mods");
             if (!Directory.Exists(modsFolderPath))
@@ -367,7 +383,7 @@ namespace Minecraft_Easy_Servers.Managers
         public void RemoveServerMod(string serverName, string modName)
         {
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             string modsFolderPath = Path.Combine(GetFolderPath(serverName), "mods");
             string modFilePrefix = $"{modName}_";
@@ -393,8 +409,11 @@ namespace Minecraft_Easy_Servers.Managers
 
         public async Task AddServerPlugin(string serverName, string pluginName, string link)
         {
+            if (pluginName.Contains("_"))
+                throw new ManagerException($"Plugin name {pluginName} cannot contain underscores. Please use a different name.");
+
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             string pluginsFolderPath = Path.Combine(GetFolderPath(serverName), "plugins");
             if (!Directory.Exists(pluginsFolderPath))
@@ -416,7 +435,7 @@ namespace Minecraft_Easy_Servers.Managers
         public void RemoveServerPlugin(string serverName, string pluginName)
         {
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             string pluginsFolderPath = Path.Combine(GetFolderPath(serverName), "plugins");
             string pluginFilePrefix = $"{pluginName}_";
@@ -434,7 +453,7 @@ namespace Minecraft_Easy_Servers.Managers
         public async Task SetServerWorld(string serverName, string link)
         {
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             string worldFolderPath = Path.Combine(GetFolderPath(serverName), "world");
             if (Directory.Exists(worldFolderPath))
@@ -455,7 +474,7 @@ namespace Minecraft_Easy_Servers.Managers
         public void SetServerResourcePack(string serverName, string link)
         {
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             if (!link.StartsWith("http") && !link.StartsWith("https"))
                 throw new ManagerException("Resource pack link must be a valid HTTP/HTTPS URL.");
@@ -467,7 +486,7 @@ namespace Minecraft_Easy_Servers.Managers
         public void SetServerProperty(string serverName, string keyValue)
         {
             if (!ServerExists(serverName))
-                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add server {serverName}");
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
 
             var keyValueParts = keyValue.Split('=', 2);
             if (keyValueParts.Length != 2)
@@ -494,7 +513,7 @@ namespace Minecraft_Easy_Servers.Managers
         public string GetServerPropertiesValue(string name, string propertyKey)
         {
             if (!ServerExists(name))
-                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add-server {name}");
 
             string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
 
@@ -518,7 +537,7 @@ namespace Minecraft_Easy_Servers.Managers
         public bool UpdateServerPropertiesValue(string name, string propertyKey, string newValue)
         {
             if (!ServerExists(name))
-                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add server {name}");
+                throw new ManagerException($"Server with name {name} doesn't exists. To create it, run: $ add-server {name}");
 
             string serverPropertiesFilePath = GetOrCreateServerPropertiesPath(name);
 
@@ -702,6 +721,63 @@ namespace Minecraft_Easy_Servers.Managers
                 }
             }
         }
+
+        public static List<string> ListAvailableServers()
+        {
+            if (RootPath != null)
+                return Directory.GetDirectories(Path.Combine(RootPath, FolderName)).Where(name => name != null).Select(Path.GetFileName).ToList() !;
+            else
+                return Directory.GetDirectories(FolderName).Select(Path.GetFileName).Where(name => name != null).ToList() !;
+        }
+
+        public List<Asset> ListServerAssets(string serverName, string assetType)
+        {
+            if (!ServerExists(serverName))
+                throw new ManagerException($"Server with name {serverName} doesn't exist. To create it, run: $ add-server {serverName}");
+
+            string serverPath = GetFolderPath(serverName);
+
+            if (assetType == "resourcepacks")
+            {
+                string resourcePack = GetServerPropertiesValue(serverName, "resource-pack");
+                return new List<Asset>
+               {
+                   new Asset
+                   {
+                       Name = Path.GetFileName(resourcePack),
+                       Link = resourcePack
+                   }
+               };
+            }
+            else if (assetType == "worlds")
+            {
+                string levelName = GetServerPropertiesValue(serverName, "level-name");
+                return new List<Asset>
+               {
+                   new Asset
+                   {
+                       Name = levelName.Split("_").FirstOrDefault() ?? string.Empty,
+                       Link = Path.Combine(serverPath, levelName)
+                   }
+               };
+            }
+            else
+            {
+                string assetPath = Path.Combine(serverPath, assetType);
+                if (!Directory.Exists(assetPath))
+                    return new List<Asset>();
+
+                return Directory.GetFiles(assetPath)
+                    .Select(file => new Asset
+                    {
+                        Name = Path.GetFileName(file).Split("_").FirstOrDefault() ?? string.Empty,
+                        Link = file
+                    })
+                    .ToList();
+            }
+        }
+
+
         public void UpdateMultiMCInstanceConfig(string serverName)
         {
             string[] platforms = { "windows", "linux", "mac" };

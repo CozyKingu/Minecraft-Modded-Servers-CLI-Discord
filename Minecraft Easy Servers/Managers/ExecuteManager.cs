@@ -307,7 +307,7 @@ namespace Minecraft_Easy_Servers.Managers
             var pidFromFile = int.Parse(File.ReadAllText(pidPath));
             pid = pidFromFile;
             var processes = Process.GetProcesses();
-            return processes.FirstOrDefault(x => x.Id == pidFromFile) != null;
+            return processes.FirstOrDefault(x => x.Id == pidFromFile && (x.ProcessName.Contains("cmd") || x.ProcessName.Contains("bash"))) != null;
         }
 
         public bool JarStatus(string jarPath, out int? pid)

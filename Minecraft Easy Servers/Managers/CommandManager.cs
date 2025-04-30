@@ -34,6 +34,32 @@ namespace Minecraft_Easy_Servers.Managers
             return null;
         }
 
+        public async Task<string?> SendCommand(int port, string rconPassword, string command)
+        {
+            var host = LOCALHOST;
+            try
+            {
+                var rcon = new RCON(new IPEndPoint(IPAddress.Parse(host), port), rconPassword);
+                await rcon.ConnectAsync();
+                // Send a simple command and retrive response as string
+                string response = await rcon.SendCommandAsync(command, TimeSpan.FromSeconds(1));
+                return IsSuccess(response) ? response : null;
+            }
+            catch (AuthenticationException)
+            {
+                Console.WriteLine("RCON password is wrong.");
+            }
+            catch (TimeoutException)
+            {
+                return "server didn't respond";
+            }
+            catch (Exception ex)
+            {
+                Console.Write(ex.ToString());
+            }
+            return null;
+        }
+
         public async Task<string?> StopServer(int port, string rconPassword)
         {
             var host = LOCALHOST;

@@ -11,11 +11,13 @@ namespace Minecraft_Easy_Servers
             // Remove commands
             IRunner<RemoveServer>, IRunner<RemoveConfig>, IRunner<RemoveMod>, IRunner<RemovePlugin>, IRunner<RemoveResourcePack>, IRunner<RemoveWorld>,
             // Server execution commands
-            IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>,
+            IRunner<CheckStatus>, IRunner<UpServer>, IRunner<DownServer>, IRunner<SendCommand>,
             // Server assets changements when already instanciated
             IRunner<SetServerWorld>, IRunner<SetServerResourcePack>, IRunner<SetServerProperty>,
             IRunner<AddServerMod>, IRunner<AddServerPlugin>, 
-            IRunner<RemoveServerMod>, IRunner<RemoveServerPlugin>
+            IRunner<RemoveServerMod>, IRunner<RemoveServerPlugin>,
+            // List commands
+            IRunner<ListServers>, IRunner<ListConfigs>, IRunner<ListAssets>, IRunner<ListServerAssets>
     {
         public ServerManager ServerManager => serverManager;
         public ConfigManager ConfigManager => configManager;
@@ -174,6 +176,77 @@ namespace Minecraft_Easy_Servers
         {
             serverManager.RemoveServerPlugin(options.ServerName, options.Name);
             await Task.CompletedTask;
+        }
+
+        public Task Run(ListServers options)
+        {
+            var servers = ServerManager.ListAvailableServers();
+            foreach (var server in servers)
+            {
+                Console.WriteLine(server);
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task Run(ListConfigs options)
+        {
+            var configs = ConfigManager.ListConfigs();
+            foreach (var config in configs)
+            {
+                Console.WriteLine(config);
+            }
+            return Task.CompletedTask;
+        }
+
+        public Task Run(ListAssets options)
+        {
+            var assetTypes = new Dictionary<string, string>
+                   {
+                       { "Mods", "mods" },
+                       { "Resource Packs", "resourcepacks" },
+                       { "Plugins", "plugins" },
+                       { "Worlds", "worlds" }
+                   };
+
+            foreach (var assetType in assetTypes)
+            {
+                Console.WriteLine($"{assetType.Key}:");
+                var assets = configManager.ListAssets(options.ConfigName, assetType.Value);
+                foreach (var asset in assets)
+                {
+                    Console.WriteLine($"- {asset.Name}");
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task Run(ListServerAssets options)
+        {
+            var assetTypes = new Dictionary<string, string>
+                   {
+                       { "Mods", "mods" },
+                       { "Recommanded Resource Pack", "resourcepacks" },
+                       { "Plugins", "plugins" },
+                       { "Current World", "worlds" }
+                   };
+
+            foreach (var assetType in assetTypes)
+            {
+                Console.WriteLine($"{assetType.Key}:");
+                var assets = serverManager.ListServerAssets(options.ServerName, assetType.Value);
+                foreach (var asset in assets)
+                {
+                    Console.WriteLine($"- {(string.IsNullOrEmpty(asset.Name) ? "No selected" : asset.Name) }");
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public async Task Run(SendCommand options)
+        {
+            await serverManager.SendCommand(options.ServerName, options.Command);
         }
     }
 }
