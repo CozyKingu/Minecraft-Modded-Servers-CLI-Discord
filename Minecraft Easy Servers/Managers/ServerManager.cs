@@ -147,7 +147,6 @@ namespace Minecraft_Easy_Servers.Managers
             UpdateServerPropertiesValue(name, "enable-rcon", "true");
             UpdateServerPropertiesValue(name, "rcon.password", "password");
 
-            string serverJar = GetServerJar(name);
             string scriptAbsolutePath = GetServerRunAbsoluteScriptPath(name);
 
             if (File.Exists(scriptAbsolutePath))
@@ -180,8 +179,9 @@ namespace Minecraft_Easy_Servers.Managers
                 Console.WriteLine($"Server script with PID {pid} is running.");
                 return;
             }
-            else if (File.Exists(serverJar))
+            else
             {
+                string serverJar = GetServerJar(name);
                 var pid = executeManager.RunBackgroundJar(
                     jarPath: serverJar,
                     ackSubString: "Done",
@@ -193,8 +193,6 @@ namespace Minecraft_Easy_Servers.Managers
                     throw new ManagerException($"Server up command failed. Jar execution failed.");
                 Console.WriteLine($"Server jar with PID {pid} is running.");
             }
-            else
-                throw new ManagerException($"No run script or jar file in {name} server folder");
         }
 
         public async Task RemoveServer(string name)
@@ -249,15 +247,15 @@ namespace Minecraft_Easy_Servers.Managers
             try
             {
                 string serverScript = GetServerRunAbsoluteScriptPath(name);
-                string serverJar = GetServerJar(name);
                 if (File.Exists(serverScript))
                 {
                     var status = executeManager.ScriptStatus(serverScript, out _);
                     if (!status)
                         return ServerStatus.NONE;
                 }
-                else if (File.Exists(serverJar))
+                else
                 {
+                    string serverJar = GetServerJar(name);
                     var jarStatus = executeManager.JarStatus(serverJar, out _);
                     if (!jarStatus)
                         return ServerStatus.NONE;
@@ -283,7 +281,6 @@ namespace Minecraft_Easy_Servers.Managers
         private bool FirstRunServerHardMode(string name)
         {
             string runScriptPath = GetServerRunAbsoluteScriptPath(name);
-            string serverJar = GetServerJar(name);
             if (File.Exists(runScriptPath))
             {
                 // Run
@@ -304,13 +301,10 @@ namespace Minecraft_Easy_Servers.Managers
                 }
                 return executeManager.ExecuteScriptAndStop(runScriptPath, "Done", "/ERROR", "All dimensions are saved"); // server can hang on "All dimensions are saved"
             }
-            else if (File.Exists(serverJar))
-            {
-                return executeManager.ExecuteJarAndStop(serverJar, "Done", $"-Xmx1G -Xms1G -jar {Path.GetFileName(serverJar)} nogui");
-            }
             else
             {
-                throw new ManagerException($"No run script or jar file in {name} server folder");
+                string serverJar = GetServerJar(name);
+                return executeManager.ExecuteJarAndStop(serverJar, "Done", $"-Xmx1G -Xms1G -jar {Path.GetFileName(serverJar)} nogui");
             }
         }
 
